@@ -4,6 +4,6 @@ GUI for annotation of molecule images.
 
 ## Installation
 
-Download [MolScribe weights file](https://huggingface.co/yujieq/MolScribe/tree/main) to `models` directory.
+Download and place [MolScribe weights file](https://huggingface.co/yujieq/MolScribe/tree/main) to `models` directory.
 
 
