@@ -19,11 +19,18 @@ from PySide6.QtGui import (
     QPixmap,
 )
 
+from molina.ocsr import AnnotatedImageData
+
+
 COLOR_BACKGROUD_WIDGETS = QColor(250, 250, 250)
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super(MainWindow, self).__init__()
+
+        self.data_images = AnnotatedImageData()
+        self.data_images.model_completed.connect(self.on_model_completed)
 
         self.setWindowTitle("MOLInA")
 
@@ -39,7 +46,7 @@ class MainWindow(QMainWindow):
         self.left_widget.setMinimumSize(200, 200)
         self.setColor(self.left_widget, COLOR_BACKGROUD_WIDGETS)
 
-        self.right_widget = QWidget(splitter)
+        self.right_widget = QLabel(splitter)
         splitter.addWidget(self.right_widget)
         self.right_widget.setMinimumSize(200, 200)
         self.setColor(self.right_widget, COLOR_BACKGROUD_WIDGETS)
@@ -58,6 +65,7 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(btn)
 
         btn = QPushButton("Predict")
+        btn.pressed.connect(self.data_images.imageToSmiles)
         toolbar.addWidget(btn)
 
         widget = QWidget()
@@ -75,6 +83,7 @@ class MainWindow(QMainWindow):
             pixmap = self.loadImage(selected_file)
             if pixmap:
                 self.left_widget.setPixmap(pixmap)
+                self.data_images.setImage(pixmap)
 
     def loadImage(self, file_path: str):
         pixmap = None
@@ -90,4 +99,10 @@ class MainWindow(QMainWindow):
         palette.setColor(QPalette.Window, color)
         widget.setPalette(palette)
 
+    def on_model_completed(self, model_result: int):
+        if model_result == 1:
+            self.setColor(self.right_widget, QColor("blue"))
+        else:
+            self.setColor(self.right_widget, QColor("red"))
 
+        
