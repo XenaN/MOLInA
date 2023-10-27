@@ -6,7 +6,7 @@ import torch, cv2
 
 from molscribe import MolScribe
 
-from typing import List, Tuple
+from typing import Any, Dict
 from PIL.Image import Image
 import numpy as np
 from PySide6.QtGui import QPixmap, QImage
@@ -19,7 +19,7 @@ CHANNELS_COUNT = 4
 
 
 class AnnotatedImageData(QObject):
-    model_completed = Signal(int)
+    model_completed = Signal(dict)
     def __init__(self):
         super(AnnotatedImageData, self).__init__()
         self.image = None
@@ -34,12 +34,12 @@ class AnnotatedImageData(QObject):
         width = image.width()
         height = image.height()
 
-        ptr = image.constBits()
-        arr = np.array(ptr).reshape(height, width, CHANNELS_COUNT)
-        self.image = arr
+        bytes_image = image.constBits()
+        array_image = np.array(bytes_image).reshape(height, width, CHANNELS_COUNT)
+        self.image = array_image
 
-    def PILtoCV2(self, image: Image) -> np.array:
-        '''Transforms PIL Image to CV2 format'''
+    def arrayToCV2(self, image: Image) -> np.array:
+        '''Transforms array Image to CV2 format'''
         
         return cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
@@ -47,12 +47,10 @@ class AnnotatedImageData(QObject):
         if self.model is None:
             self.model = MolScribe('./models/molscribe_aux_1m.pth', torch.device('cpu'))
         
-        image = self.PILtoCV2(self.image)
-        res = self.model.predict_image(image, return_confidence = True)
-        print(type(res), res)
-        res = 1
+        image = self.arrayToCV2(self.image)
+        result = self.model.predict_image(image, return_confidence = True)
 
-        self.model_completed.emit(res)
+        self.model_completed.emit(result)
         
         
 

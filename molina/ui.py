@@ -1,4 +1,8 @@
 ''''''
+import json
+
+from typing import List, Dict
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QGraphicsView,
@@ -11,7 +15,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QWidget,
     QSplitter,
-    QSizePolicy
+    QTextEdit,
 )
 from PySide6.QtGui import (
     QPalette, 
@@ -46,10 +50,12 @@ class MainWindow(QMainWindow):
         self.left_widget.setMinimumSize(200, 200)
         self.setColor(self.left_widget, COLOR_BACKGROUD_WIDGETS)
 
-        self.right_widget = QLabel(splitter)
+        self.right_widget = QTextEdit(splitter)
         splitter.addWidget(self.right_widget)
         self.right_widget.setMinimumSize(200, 200)
         self.setColor(self.right_widget, COLOR_BACKGROUD_WIDGETS)
+        self.right_widget.setLineWrapMode(QTextEdit.WidgetWidth)
+        self.right_widget.setReadOnly(True)
 
         splitter.setStretchFactor(0, 2)
         splitter.setStretchFactor(1, 1)
@@ -99,10 +105,9 @@ class MainWindow(QMainWindow):
         palette.setColor(QPalette.Window, color)
         widget.setPalette(palette)
 
-    def on_model_completed(self, model_result: int):
-        if model_result == 1:
-            self.setColor(self.right_widget, QColor("blue"))
-        else:
-            self.setColor(self.right_widget, QColor("red"))
+    def on_model_completed(self, model_result: Dict):
+        if model_result:
+            model_result_json = json.dumps(model_result, indent=4, sort_keys=True)
+            self.right_widget.setPlainText(model_result_json)
 
         
