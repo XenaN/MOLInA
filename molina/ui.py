@@ -30,7 +30,7 @@ COLOR_BACKGROUD_WIDGETS = QColor(250, 250, 250)
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self) -> None:
         super(MainWindow, self).__init__()
 
         self.data_images = AnnotatedImageData()
@@ -78,7 +78,7 @@ class MainWindow(QMainWindow):
         widget.setLayout(pagelayout)
         self.setCentralWidget(widget)
 
-    def openImage(self):
+    def openImage(self) -> None:
         options = QFileDialog.Options()
         options |= QFileDialog.ReadOnly
         file_dialog = QFileDialog(self, options=options)
@@ -99,15 +99,14 @@ class MainWindow(QMainWindow):
             print(f"Error loading image: {e}")
         return pixmap
 
-    def setColor(self, widget: QWidget, color: QColor):
+    def setColor(self, widget: QWidget, color: QColor) -> None:
         widget.setAutoFillBackground(True)
         palette = widget.palette()
         palette.setColor(QPalette.Window, color)
         widget.setPalette(palette)
 
-    def on_model_completed(self, model_result: Dict):
+    def on_model_completed(self, model_result: Dict) -> None:
         if model_result:
             model_result_json = json.dumps(model_result, indent=4, sort_keys=True)
             self.right_widget.setPlainText(model_result_json)
 
-        

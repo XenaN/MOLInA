@@ -6,7 +6,7 @@ import torch, cv2
 
 from molscribe import MolScribe
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from PIL.Image import Image
 import numpy as np
 from PySide6.QtGui import QPixmap, QImage
@@ -19,15 +19,18 @@ CHANNELS_COUNT = 4
 
 
 class AnnotatedImageData(QObject):
-    model_completed = Signal(dict)
+    '''Class storing uploaded molecule images'''
+    model_completed: Signal = Signal(dict)
+    
+    image: Optional[np.array] = None
+    annotation: Optional[Dict] = None
+    model: Optional[MolScribe] = None
+    
     def __init__(self):
         super(AnnotatedImageData, self).__init__()
-        self.image = None
-        self.annotation = None
-        self.model = None
-
 
     def setImage(self, image: QPixmap):
+        '''Gets image data from UI and prepares it for MolScribe'''
         image = image.toImage()
         image = image.convertToFormat(QImage.Format.Format_RGBA8888)
 
@@ -43,12 +46,14 @@ class AnnotatedImageData(QObject):
         
         return cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
-    def imageToSmiles(self):
+    def imageToSmiles(self) -> None:
+        '''Generates annotation & relevant info via MolScribe functionality'''
         if self.model is None:
             self.model = MolScribe('./models/molscribe_aux_1m.pth', torch.device('cpu'))
-        
+
         image = self.arrayToCV2(self.image)
-        result = self.model.predict_image(image, return_confidence = True)
+        result = self.model.predict_image(image, return_confidence = True,
+                                          return_atoms_bonds = True)
 
         self.model_completed.emit(result)
         
