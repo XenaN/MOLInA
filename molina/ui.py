@@ -1,22 +1,4 @@
 ''''''
-
-#from PySide6.QtCore import QSize
-#from PySide6.QtWidgets import QMainWindow, QPushButton
-
-
-#class MainWindow(QMainWindow):
-#    def __init__(self):
-#       super().__init__()
-#        
-#        self.setWindowTitle("My App")
-#        
-#        button = QPushButton("Press Me!")
-        
-#        self.setFixedSize(QSize(400, 300))
-        
-        # Set the central widget of the Window.
-#        self.setCentralWidget(button)
-
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QGraphicsView,
@@ -26,9 +8,10 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QPushButton,
     QFileDialog,
-    QVBoxLayout,
+    QHBoxLayout,
     QWidget,
     QSplitter,
+    QSizePolicy
 )
 from PySide6.QtGui import (
     QPalette, 
@@ -36,23 +19,15 @@ from PySide6.QtGui import (
     QPixmap,
 )
 
-
-class ColoredWidget(QWidget):
-    def __init__(self, color):
-        super(ColoredWidget, self).__init__()
-        self.setAutoFillBackground(True)
-
-        palette = self.palette()
-        palette.setColor(QPalette.Window, QColor(color))
-        self.setPalette(palette)
+COLOR_BACKGROUD_WIDGETS = QColor(250, 250, 250)
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super(MainWindow, self).__init__()
 
-        self.setWindowTitle("My App")
+        self.setWindowTitle("MOLInA")
 
-        pagelayout = QVBoxLayout()
+        pagelayout = QHBoxLayout()
         splitter =  QSplitter(self)
         toolbar = QToolBar("My main toolbar")
         self.addToolBar(toolbar)
@@ -60,11 +35,20 @@ class MainWindow(QMainWindow):
         pagelayout.addWidget(splitter)
         
         self.left_widget = QLabel(splitter)
+        splitter.addWidget(self.left_widget)
+        self.left_widget.setMinimumSize(200, 200)
+        self.setColor(self.left_widget, COLOR_BACKGROUD_WIDGETS)
 
         self.right_widget = QWidget(splitter)
+        splitter.addWidget(self.right_widget)
+        self.right_widget.setMinimumSize(200, 200)
+        self.setColor(self.right_widget, COLOR_BACKGROUD_WIDGETS)
+
+        splitter.setStretchFactor(0, 2)
+        splitter.setStretchFactor(1, 1)
 
         btn = QPushButton("Open")
-        btn.pressed.connect(self.open_image)
+        btn.pressed.connect(self.openImage)
         toolbar.addWidget(btn)
 
         btn = QPushButton("Save")
@@ -80,7 +64,7 @@ class MainWindow(QMainWindow):
         widget.setLayout(pagelayout)
         self.setCentralWidget(widget)
 
-    def open_image(self):
+    def openImage(self):
         options = QFileDialog.Options()
         options |= QFileDialog.ReadOnly
         file_dialog = QFileDialog(self, options=options)
@@ -88,16 +72,22 @@ class MainWindow(QMainWindow):
 
         if file_dialog.exec_():
             selected_file = file_dialog.selectedFiles()[0]
-            pixmap = self.load_image(selected_file)
+            pixmap = self.loadImage(selected_file)
             if pixmap:
                 self.left_widget.setPixmap(pixmap)
 
-    def load_image(self, file_path):
+    def loadImage(self, file_path: str):
         pixmap = None
         try:
             pixmap = QPixmap(file_path)
         except Exception as e:
             print(f"Error loading image: {e}")
         return pixmap
+
+    def setColor(self, widget: QWidget, color: QColor):
+        widget.setAutoFillBackground(True)
+        palette = widget.palette()
+        palette.setColor(QPalette.Window, color)
+        widget.setPalette(palette)
 
 
