@@ -23,7 +23,7 @@ from PySide6.QtGui import (
     QPixmap,
 )
 
-from molina.ocsr import AnnotatedImageData
+from molina.data_structs import Dataset
 
 
 COLOR_BACKGROUD_WIDGETS = QColor(250, 250, 250)
