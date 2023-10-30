@@ -33,8 +33,8 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super(MainWindow, self).__init__()
 
-        self.data_images = AnnotatedImageData()
-        self.data_images.model_completed.connect(self.on_model_completed)
+        # self.data_images = AnnotatedImageData()
+        # self.data_images.model_completed.connect(self.on_model_completed)
 
         self.setWindowTitle("MOLInA")
 
@@ -71,7 +71,7 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(btn)
 
         btn = QPushButton("Predict")
-        btn.pressed.connect(self.data_images.imageToSmiles)
+        # btn.pressed.connect(self.data_images.imageToSmiles)
         toolbar.addWidget(btn)
 
         widget = QWidget()

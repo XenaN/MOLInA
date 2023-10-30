@@ -53,15 +53,15 @@ class ImageData():
         
         # update self.atoms and self.bonds
         
-        
-        return
+        pass
+        # return
     
     def save_annotation(self) -> None:
         '''Saves current annotation to the corresponding file'''
         # TODO: we need exceptions, do not forget to create the ticket
         
-        
-        return
+        pass
+        # return
 
 
 def image_data_from_image_file(path: str) -> ImageData:
@@ -77,8 +77,8 @@ def image_data_from_image_file(path: str) -> ImageData:
     # prepare atoms and bonds data structures
     
     # construct the object
-    
-    return
+    pass
+    # return
 
 
 @dataclass
@@ -89,10 +89,11 @@ class Dataset():
     '''List of images forming the dataset'''
     current_image: ImageData
     '''Image which is viewed in GUI'''
-    current_image_idx: int = 0
-    '''Index of the current image'''
     num_images: int
     '''Total number of images in dataset'''
+    current_image_idx: int = 0
+    '''Index of the current image'''
+    
     
     # HINT: possibly good idea to make __post_init__ and do not init current_image,
     #       so that it will be generated from self.images and self.current_image_idx
@@ -100,8 +101,8 @@ class Dataset():
     
     def change_current_image(self, idx: int) -> None:
         '''Changes current image to another one by give idx'''
-        
-        return
+        pass
+        # return
 
 
 # HINT: next two functions possibly require additional code decomposition
@@ -109,8 +110,8 @@ class Dataset():
 def dataset_from_file(fs) -> Dataset:
     '''Creates Dataset from single image file'''
     
-    
-    return
+    pass
+    # return
 
 
 def dataset_from_directory(path_dir) -> Dataset:
@@ -118,7 +119,7 @@ def dataset_from_directory(path_dir) -> Dataset:
     # filter image files via os.listdir
     
     # cycle over files
-    
-    return
+    pass
+    # return
 
 
