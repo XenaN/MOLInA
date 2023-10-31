@@ -3,9 +3,9 @@ import json
 
 from typing import List, Dict
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSize, QDir
 from PySide6.QtWidgets import (
-    QGraphicsView,
+    QToolButton,
     QSizePolicy,
     QLabel,
     QToolBar,
@@ -21,17 +21,20 @@ from PySide6.QtGui import (
     QPalette, 
     QColor, 
     QPixmap,
+    QIcon,
 )
 
 from molina.data_structs import Dataset
 
 
 COLOR_BACKGROUD_WIDGETS = QColor(250, 250, 250)
+RESOURCES_PATH = QDir("molina/resources")
 
 
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super(MainWindow, self).__init__()
+        self.zoom_increment = 0.1
 
         # self.data_images = Dataset()
         # self.data_images.model_completed.connect(self.on_model_completed)
@@ -72,7 +75,21 @@ class MainWindow(QMainWindow):
         btn = QPushButton("Save")
         toolbar.addWidget(btn)
 
+        btn = QToolButton()
+        btn.setIcon(QIcon(RESOURCES_PATH.filePath("left_button.png")))
+        toolbar.addWidget(btn)
+
+        btn = QToolButton()
+        btn.setIcon(QIcon(RESOURCES_PATH.filePath("right_button.png")))
+        toolbar.addWidget(btn)
+
+        toolbar.setIconSize(QSize(19, 19))
+
         btn = QPushButton("Annotate")
+        toolbar.addWidget(btn)
+
+        btn = QPushButton("Current Model")
+        # btn.pressed.connect(self.data_images.run_molscribe)
         toolbar.addWidget(btn)
 
         btn = QPushButton("Predict")
@@ -84,6 +101,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(widget)
         self.showMaximized()
 
+    
     def openImage(self) -> None:
         options = QFileDialog.Options()
         options |= QFileDialog.ReadOnly
@@ -115,4 +133,14 @@ class MainWindow(QMainWindow):
         if model_result:
             model_result_json = json.dumps(model_result, indent=4, sort_keys=True)
             self.right_widget.setPlainText(model_result_json)
+
+    def zoom_in(self):
+      
+      self.scale_factor = min(self.scale_factor + self.zoom_increment, 5) 
+      self.update()
+      
+    def zoom_out(self):
+      
+      self.scale_factor = max(2.5, self.scale_factor - self.zoom_increment)
+      self.update()
 
