@@ -34,7 +34,7 @@ RESOURCES_PATH = QDir("molina/resources")
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super(MainWindow, self).__init__()
-        self.zoom_increment = 0.1
+        self.scale_factor = 1
 
         # self.data_images = Dataset()
         # self.data_images.model_completed.connect(self.on_model_completed)
@@ -113,12 +113,14 @@ class MainWindow(QMainWindow):
             pixmap = self.loadImage(selected_file)
             if pixmap:
                 self.left_widget.setPixmap(pixmap)
-                self.data_images.setImage(pixmap)
+                # self.data_images.setImage(pixmap)
 
     def loadImage(self, file_path: str):
         pixmap = None
         try:
             pixmap = QPixmap(file_path)
+            self.scale_factor = pixmap.height() / self.left_widget.height()
+            pixmap = pixmap.scaledToHeight(self.left_widget.height())
         except Exception as e:
             print(f"Error loading image: {e}")
         return pixmap
