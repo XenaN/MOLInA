@@ -6,7 +6,7 @@ from typing import List, Dict
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QGraphicsView,
-    QGraphicsScene,
+    QSizePolicy,
     QLabel,
     QToolBar,
     QMainWindow,
@@ -33,7 +33,7 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super(MainWindow, self).__init__()
 
-        # self.data_images = AnnotatedImageData()
+        # self.data_images = Dataset()
         # self.data_images.model_completed.connect(self.on_model_completed)
 
         self.setWindowTitle("MOLInA")
@@ -48,7 +48,12 @@ class MainWindow(QMainWindow):
         self.left_widget = QLabel(splitter)
         splitter.addWidget(self.left_widget)
         self.left_widget.setMinimumSize(200, 200)
+        self.left_widget.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Expanding
+        )
         self.setColor(self.left_widget, COLOR_BACKGROUD_WIDGETS)
+        self.left_widget.updateGeometry()
 
         self.right_widget = QTextEdit(splitter)
         splitter.addWidget(self.right_widget)
@@ -71,12 +76,13 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(btn)
 
         btn = QPushButton("Predict")
-        # btn.pressed.connect(self.data_images.imageToSmiles)
+        # btn.pressed.connect(self.data_images.run_molscribe)
         toolbar.addWidget(btn)
 
         widget = QWidget()
         widget.setLayout(pagelayout)
         self.setCentralWidget(widget)
+        self.showMaximized()
 
     def openImage(self) -> None:
         options = QFileDialog.Options()
