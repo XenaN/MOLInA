@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QFileDialog,
     QHBoxLayout,
+    QVBoxLayout,
     QWidget,
     QSplitter,
     QTextEdit,
@@ -24,10 +25,10 @@ from PySide6.QtGui import (
     QIcon,
 )
 
-from molina.data_structs import Dataset
+# from molina.data_structs import Dataset
 
 
-COLOR_BACKGROUD_WIDGETS = QColor(250, 250, 250)
+COLOR_BACKGROUND_WIDGETS = QColor(250, 250, 250)
 RESOURCES_PATH = QDir("molina/resources")
 
 
@@ -43,65 +44,85 @@ class MainWindow(QMainWindow):
 
         pagelayout = QHBoxLayout()
         splitter =  QSplitter(self)
-        toolbar = QToolBar("My main toolbar")
-        self.addToolBar(toolbar)
-
-        pagelayout.addWidget(splitter)
+        toolbar_main = QToolBar()
         
-        self.left_widget = QLabel(splitter)
-        splitter.addWidget(self.left_widget)
-        self.left_widget.setMinimumSize(200, 200)
-        self.left_widget.setSizePolicy(
+        
+        left_widget = QWidget()
+        left_widget_layout = QVBoxLayout(left_widget)
+        toolbar_zoom = QToolBar()
+        
+        self.addToolBar(toolbar_main)
+        pagelayout.addWidget(splitter)
+
+        self.button_zoom_in = QToolButton()
+        self.button_zoom_in.setIcon(QIcon(RESOURCES_PATH.filePath("plus.png")))
+        self.button_zoom_in.clicked.connect(self.zoomIn)
+        toolbar_zoom.addWidget(self.button_zoom_in)
+
+        self.button_zoom_out = QToolButton() 
+        self.button_zoom_out.setIcon(QIcon(RESOURCES_PATH.filePath("minus.png")))
+        self.button_zoom_out.clicked.connect(self.zoomOut)
+        toolbar_zoom.addWidget(self.button_zoom_out)
+
+        left_widget_layout.addWidget(toolbar_zoom)
+        
+        self.image_widget = QLabel(splitter)
+        left_widget_layout.addWidget(self.image_widget)
+        self.image_widget.setMinimumSize(200, 200)
+        self.image_widget.setSizePolicy(
             QSizePolicy.Policy.Expanding,
             QSizePolicy.Policy.Expanding
         )
-        self.setColor(self.left_widget, COLOR_BACKGROUD_WIDGETS)
-        self.left_widget.updateGeometry()
+        self.setColor(self.image_widget, COLOR_BACKGROUND_WIDGETS)
+        self.image_widget.updateGeometry()
+        self.pixmap = None
+
+        splitter.addWidget(left_widget)
 
         self.right_widget = QTextEdit(splitter)
-        splitter.addWidget(self.right_widget)
         self.right_widget.setMinimumSize(200, 200)
-        self.setColor(self.right_widget, COLOR_BACKGROUD_WIDGETS)
+        self.setColor(self.right_widget, COLOR_BACKGROUND_WIDGETS)
         self.right_widget.setLineWrapMode(QTextEdit.WidgetWidth)
         self.right_widget.setReadOnly(True)
+
+        splitter.addWidget(self.right_widget)
 
         splitter.setStretchFactor(0, 2)
         splitter.setStretchFactor(1, 1)
 
-        btn = QPushButton("Open")
-        btn.pressed.connect(self.openImage)
-        toolbar.addWidget(btn)
+        button_open = QPushButton("Open")
+        button_open.pressed.connect(self.openImage)
+        toolbar_main.addWidget(button_open)
 
-        btn = QPushButton("Save")
-        toolbar.addWidget(btn)
+        button_save = QPushButton("Save")
+        toolbar_main.addWidget(button_save)
 
-        btn = QToolButton()
-        btn.setIcon(QIcon(RESOURCES_PATH.filePath("left_button.png")))
-        toolbar.addWidget(btn)
+        button_left = QToolButton()
+        button_left.setIcon(QIcon(RESOURCES_PATH.filePath("left_button.png")))
+        toolbar_main.addWidget(button_left)
 
-        btn = QToolButton()
-        btn.setIcon(QIcon(RESOURCES_PATH.filePath("right_button.png")))
-        toolbar.addWidget(btn)
+        button_right = QToolButton()
+        button_right.setIcon(QIcon(RESOURCES_PATH.filePath("right_button.png")))
+        toolbar_main.addWidget(button_right)
 
-        toolbar.setIconSize(QSize(19, 19))
+        toolbar_main.setIconSize(QSize(19, 19))
 
-        btn = QPushButton("Annotate")
-        toolbar.addWidget(btn)
+        button_annotate = QPushButton("Annotate")
+        toolbar_main.addWidget(button_annotate)
 
-        btn = QPushButton("Current Model")
+        button_current_model = QPushButton("Current Model")
         # btn.pressed.connect(self.data_images.run_molscribe)
-        toolbar.addWidget(btn)
+        toolbar_main.addWidget(button_current_model)
 
-        btn = QPushButton("Predict")
+        button_predict = QPushButton("Predict")
         # btn.pressed.connect(self.data_images.run_molscribe)
-        toolbar.addWidget(btn)
+        toolbar_main.addWidget(button_predict)
 
         widget = QWidget()
         widget.setLayout(pagelayout)
         self.setCentralWidget(widget)
         self.showMaximized()
 
-    
     def openImage(self) -> None:
         options = QFileDialog.Options()
         options |= QFileDialog.ReadOnly
@@ -110,20 +131,28 @@ class MainWindow(QMainWindow):
 
         if file_dialog.exec_():
             selected_file = file_dialog.selectedFiles()[0]
-            pixmap = self.loadImage(selected_file)
-            if pixmap:
-                self.left_widget.setPixmap(pixmap)
-                # self.data_images.setImage(pixmap)
+            self.pixmap = self.loadImage(selected_file)
+            if self.pixmap:
+                self.image_widget.setPixmap(self.pixmap)
+                # self.data_images.setImage(self.pixmap)
 
-    def loadImage(self, file_path: str):
-        pixmap = None
+    def loadImage(self, file_path: str) -> QPixmap:
         try:
-            pixmap = QPixmap(file_path)
-            self.scale_factor = pixmap.height() / self.left_widget.height()
-            pixmap = pixmap.scaledToHeight(self.left_widget.height())
+            self.pixmap = QPixmap(file_path)
+            if self.pixmap.height() >= self.pixmap.width():
+                self.pixmap = self.pixmap.scaledToHeight(self.image_widget.height())
+                # if picture is still out of boundaries
+                if self.pixmap.width() >= self.image_widget.width():
+                    self.pixmap = self.pixmap.scaledToWidth(self.image_widget.width())
+            else:
+                self.pixmap = self.pixmap.scaledToWidth(self.image_widget.width())
+                # if picture is still out of boundaries
+                if self.pixmap.height() >= self.image_widget.height():
+                    self.pixmap = self.pixmap.scaledToHeight(self.image_widget.height())
+
         except Exception as e:
             print(f"Error loading image: {e}")
-        return pixmap
+        return self.pixmap
 
     def setColor(self, widget: QWidget, color: QColor) -> None:
         widget.setAutoFillBackground(True)
@@ -131,18 +160,34 @@ class MainWindow(QMainWindow):
         palette.setColor(QPalette.Window, color)
         widget.setPalette(palette)
 
-    def on_model_completed(self, model_result: Dict) -> None:
+    def onModelCompleted(self, model_result: Dict) -> None:
         if model_result:
             model_result_json = json.dumps(model_result, indent=4, sort_keys=True)
             self.right_widget.setPlainText(model_result_json)
+    
+    def resizeEvent(self, event) -> None:
+        self.setPixmapSize()   
+    
+    def setPixmapSize(self) -> None: 
+        if not self.pixmap:
+            return
+        size = self.image_widget.size()
+        self.image_widget.setPixmap(self.pixmap.scaled(
+            self.scale_factor * size,
+            Qt.KeepAspectRatio))
 
-    def zoom_in(self):
+    def zoomIn(self) -> None:
+      self.scale_factor *= 1.1
+      self.resizeImage()
       
-      self.scale_factor = min(self.scale_factor + self.zoom_increment, 5) 
-      self.update()
-      
-    def zoom_out(self):
-      
-      self.scale_factor = max(2.5, self.scale_factor - self.zoom_increment)
-      self.update()
+    def zoomOut(self) -> None:
+      self.scale_factor /= 1.1
+      self.resizeImage()
 
+    def resizeImage(self) -> None:
+        if not self.pixmap:
+            return
+        size = self.image_widget.size()
+        scaled_pixmap = self.pixmap.scaled(self.scale_factor * size, Qt.KeepAspectRatio)
+        self.image_widget.setPixmap(scaled_pixmap)
+    
