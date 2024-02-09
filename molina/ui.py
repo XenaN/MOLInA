@@ -17,6 +17,9 @@ from PySide6.QtWidgets import (
     QWidget,
     QSplitter,
     QTextEdit,
+    QFileSystemModel,
+    QTreeView,
+    QAbstractItemView,
 )
 from PySide6.QtGui import (
     QPalette, 
@@ -30,6 +33,21 @@ from PySide6.QtGui import (
 
 COLOR_BACKGROUND_WIDGETS = QColor(250, 250, 250)
 RESOURCES_PATH = QDir("molina/resources")
+
+
+class FileManager(QWidget):
+    def __init__(self, parent: QWidget) -> None:
+        super(FileManager, self).__init__(parent)
+        self.file_view = QTreeView(self)
+        self.file_model = QFileSystemModel(self)
+        self.file_model.setRootPath(QDir.rootPath())
+        self.file_model.setFilter(QDir.NoDotAndDotDot | QDir.AllDirs | QDir.Files)
+        self.file_model.setNameFilters(["*.jpg", "*.jpeg", "*.png", "*.gif", "*.bmp"])
+        self.file_model.setNameFilterDisables(False)
+        self.file_view.setModel(self.file_model)
+        self.file_model.setReadOnly(False)
+        self.file_view.setColumnWidth(0,200)
+        self.file_view.setSelectionMode(QAbstractItemView.ExtendedSelection)
 
 
 class MainWindow(QMainWindow):
@@ -50,7 +68,14 @@ class MainWindow(QMainWindow):
         left_widget = QWidget()
         left_widget_layout = QVBoxLayout(left_widget)
         toolbar_zoom = QToolBar()
-        
+
+        self.file_widget = FileManager(splitter)
+        self.file_widget.setMinimumSize(100, 200)
+        self.file_widget.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Expanding)
+        self.file_widget.setMaximumWidth(300) 
+
+        splitter.addWidget(self.file_widget)
+
         self.addToolBar(toolbar_main)
         pagelayout.addWidget(splitter)
 
