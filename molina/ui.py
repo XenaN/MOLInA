@@ -38,6 +38,7 @@ RESOURCES_PATH = QDir("molina/resources")
 class FileManager(QWidget):
     def __init__(self, parent: QWidget) -> None:
         super(FileManager, self).__init__(parent)
+        self.file_layout = QVBoxLayout(self)
         self.file_view = QTreeView(self)
         self.file_model = QFileSystemModel(self)
         self.file_model.setRootPath(QDir.rootPath())
@@ -48,6 +49,10 @@ class FileManager(QWidget):
         self.file_model.setReadOnly(False)
         self.file_view.setColumnWidth(0,200)
         self.file_view.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.file_view.setMinimumSize(200, 200)
+        self.file_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+        self.file_layout.addWidget(self.file_view)
 
 
 class MainWindow(QMainWindow):
@@ -60,39 +65,35 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("MOLInA")
 
-        pagelayout = QHBoxLayout()
-        splitter =  QSplitter(self)
-        toolbar_main = QToolBar()
+        self.page_layout = QHBoxLayout()
+        self.splitter =  QSplitter(self)
+        self.toolbar_main = QToolBar()
         
         
-        left_widget = QWidget()
-        left_widget_layout = QVBoxLayout(left_widget)
-        toolbar_zoom = QToolBar()
+        self.left_widget = QWidget()
+        self.left_widget_layout = QVBoxLayout(self.left_widget)
+        self.toolbar_zoom = QToolBar()
+        self.file_view = FileManager(self)
 
-        self.file_widget = FileManager(splitter)
-        self.file_widget.setMinimumSize(100, 200)
-        self.file_widget.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Expanding)
-        self.file_widget.setMaximumWidth(300) 
+        self.splitter.addWidget(self.file_view)
 
-        splitter.addWidget(self.file_widget)
-
-        self.addToolBar(toolbar_main)
-        pagelayout.addWidget(splitter)
+        self.addToolBar(self.toolbar_main)
+        self.page_layout.addWidget(self.splitter)
 
         self.button_zoom_in = QToolButton()
         self.button_zoom_in.setIcon(QIcon(RESOURCES_PATH.filePath("plus.png")))
         self.button_zoom_in.clicked.connect(self.zoomIn)
-        toolbar_zoom.addWidget(self.button_zoom_in)
+        self.toolbar_zoom.addWidget(self.button_zoom_in)
 
         self.button_zoom_out = QToolButton() 
         self.button_zoom_out.setIcon(QIcon(RESOURCES_PATH.filePath("minus.png")))
         self.button_zoom_out.clicked.connect(self.zoomOut)
-        toolbar_zoom.addWidget(self.button_zoom_out)
+        self.toolbar_zoom.addWidget(self.button_zoom_out)
 
-        left_widget_layout.addWidget(toolbar_zoom)
+        self.left_widget_layout.addWidget(self.toolbar_zoom)
         
-        self.image_widget = QLabel(splitter)
-        left_widget_layout.addWidget(self.image_widget)
+        self.image_widget = QLabel(self.splitter)
+        self.left_widget_layout.addWidget(self.image_widget)
         self.image_widget.setMinimumSize(200, 200)
         self.image_widget.setSizePolicy(
             QSizePolicy.Policy.Expanding,
@@ -102,50 +103,51 @@ class MainWindow(QMainWindow):
         self.image_widget.updateGeometry()
         self.pixmap = None
 
-        splitter.addWidget(left_widget)
+        self.splitter.addWidget(self.left_widget)
 
-        self.right_widget = QTextEdit(splitter)
+        self.right_widget = QTextEdit(self.splitter)
         self.right_widget.setMinimumSize(200, 200)
         self.setColor(self.right_widget, COLOR_BACKGROUND_WIDGETS)
         self.right_widget.setLineWrapMode(QTextEdit.WidgetWidth)
         self.right_widget.setReadOnly(True)
 
-        splitter.addWidget(self.right_widget)
+        self.splitter.addWidget(self.right_widget)
 
-        splitter.setStretchFactor(0, 2)
-        splitter.setStretchFactor(1, 1)
+        self.splitter.setStretchFactor(0, 1)
+        self.splitter.setStretchFactor(1, 10)
+        self.splitter.setStretchFactor(2, 5)
 
-        button_open = QPushButton("Open")
-        button_open.pressed.connect(self.openImage)
-        toolbar_main.addWidget(button_open)
+        self.button_open = QPushButton("Open")
+        self.button_open.pressed.connect(self.openImage)
+        self.toolbar_main.addWidget(self.button_open)
 
-        button_save = QPushButton("Save")
-        toolbar_main.addWidget(button_save)
+        self.button_save = QPushButton("Save")
+        self.toolbar_main.addWidget(self.button_save)
 
-        button_left = QToolButton()
-        button_left.setIcon(QIcon(RESOURCES_PATH.filePath("left_button.png")))
-        toolbar_main.addWidget(button_left)
+        self.button_left = QToolButton()
+        self.button_left.setIcon(QIcon(RESOURCES_PATH.filePath("left_button.png")))
+        self.toolbar_main.addWidget(self.button_left)
 
-        button_right = QToolButton()
-        button_right.setIcon(QIcon(RESOURCES_PATH.filePath("right_button.png")))
-        toolbar_main.addWidget(button_right)
+        self.button_right = QToolButton()
+        self.button_right.setIcon(QIcon(RESOURCES_PATH.filePath("right_button.png")))
+        self.toolbar_main.addWidget(self.button_right)
 
-        toolbar_main.setIconSize(QSize(19, 19))
+        self.toolbar_main.setIconSize(QSize(19, 19))
 
-        button_annotate = QPushButton("Annotate")
-        toolbar_main.addWidget(button_annotate)
+        self.button_annotate = QPushButton("Annotate")
+        self.toolbar_main.addWidget(self.button_annotate)
 
-        button_current_model = QPushButton("Current Model")
+        self.button_current_model = QPushButton("Current Model")
         # btn.pressed.connect(self.data_images.run_molscribe)
-        toolbar_main.addWidget(button_current_model)
+        self.toolbar_main.addWidget(self.button_current_model)
 
-        button_predict = QPushButton("Predict")
+        self.button_predict = QPushButton("Predict")
         # btn.pressed.connect(self.data_images.run_molscribe)
-        toolbar_main.addWidget(button_predict)
+        self.toolbar_main.addWidget(self.button_predict)
 
-        widget = QWidget()
-        widget.setLayout(pagelayout)
-        self.setCentralWidget(widget)
+        self.widget = QWidget()
+        self.widget.setLayout(self.page_layout)
+        self.setCentralWidget(self.widget)
         self.showMaximized()
 
     def openImage(self) -> None:
