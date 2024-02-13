@@ -3,7 +3,13 @@ import json
 
 from typing import List, Dict
 
-from PySide6.QtCore import Qt, QSize, QDir
+from PySide6.QtCore import (
+    Qt, 
+    QSize, 
+    QDir, 
+    Signal, 
+    QModelIndex,
+)
 from PySide6.QtWidgets import (
     QToolButton,
     QSizePolicy,
@@ -36,6 +42,7 @@ RESOURCES_PATH = QDir("molina/resources")
 
 
 class FileManager(QWidget):
+    itemSelected = Signal(str)
     def __init__(self, parent: QWidget) -> None:
         super(FileManager, self).__init__(parent)
         self.file_layout = QVBoxLayout(self)
@@ -53,6 +60,12 @@ class FileManager(QWidget):
         self.file_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         self.file_layout.addWidget(self.file_view)
+
+        self.file_view.clicked.connect(self.onClicked)
+
+    def onClicked(self, index: QModelIndex):
+        path = self.sender().model().filePath(index)
+        self.itemSelected.emit(path)
 
 
 class MainWindow(QMainWindow):
@@ -73,9 +86,10 @@ class MainWindow(QMainWindow):
         self.left_widget = QWidget()
         self.left_widget_layout = QVBoxLayout(self.left_widget)
         self.toolbar_zoom = QToolBar()
-        self.file_view = FileManager(self)
+        self.file_widget = FileManager(self)
+        self.file_widget.itemSelected.connect(self.onFileManagerItemSelected)
 
-        self.splitter.addWidget(self.file_view)
+        self.splitter.addWidget(self.file_widget)
 
         self.addToolBar(self.toolbar_main)
         self.page_layout.addWidget(self.splitter)
@@ -138,17 +152,22 @@ class MainWindow(QMainWindow):
         self.toolbar_main.addWidget(self.button_annotate)
 
         self.button_current_model = QPushButton("Current Model")
-        # btn.pressed.connect(self.data_images.run_molscribe)
+        # self.button_current_model.pressed.connect(self.data_images.run_molscribe)
         self.toolbar_main.addWidget(self.button_current_model)
 
         self.button_predict = QPushButton("Predict")
-        # btn.pressed.connect(self.data_images.run_molscribe)
+        # self.button_predict.pressed.connect(self.data_images.run_molscribe)
         self.toolbar_main.addWidget(self.button_predict)
 
         self.widget = QWidget()
         self.widget.setLayout(self.page_layout)
         self.setCentralWidget(self.widget)
         self.showMaximized()
+
+    def onFileManagerItemSelected(self, path: str):
+        self.pixmap = self.loadImage(path)
+        if self.pixmap:
+            self.image_widget.setPixmap(self.pixmap)
 
     def openImage(self) -> None:
         options = QFileDialog.Options()
