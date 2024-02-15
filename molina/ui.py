@@ -2,6 +2,7 @@
 import json
 
 from typing import List, Dict
+import numpy.typing as npt
 
 from PySide6.QtCore import (
     Qt, 
@@ -32,9 +33,10 @@ from PySide6.QtGui import (
     QColor, 
     QPixmap,
     QIcon,
+    QImage,
 )
 
-# from molina.data_structs import Dataset
+from molina.data_structs import Dataset
 
 
 COLOR_BACKGROUND_WIDGETS = QColor(250, 250, 250)
@@ -47,19 +49,23 @@ class FileManager(QWidget):
         super(FileManager, self).__init__(parent)
         self.file_layout = QVBoxLayout(self)
         self.file_view = QTreeView(self)
+        
         self.file_model = QFileSystemModel(self)
         self.file_model.setRootPath(QDir.rootPath())
         self.file_model.setFilter(QDir.NoDotAndDotDot | QDir.AllDirs | QDir.Files)
         self.file_model.setNameFilters(["*.jpg", "*.jpeg", "*.png", "*.gif", "*.bmp"])
         self.file_model.setNameFilterDisables(False)
-        self.file_view.setModel(self.file_model)
         self.file_model.setReadOnly(False)
+        
+        self.file_view.setModel(self.file_model)
         self.file_view.setColumnWidth(0,200)
         self.file_view.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.file_view.setMinimumSize(200, 200)
         self.file_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         self.file_layout.addWidget(self.file_view)
+
+        #TODO: don't emit signal when it is not
 
         self.file_view.clicked.connect(self.onClicked)
 
@@ -73,7 +79,8 @@ class MainWindow(QMainWindow):
         super(MainWindow, self).__init__()
         self.scale_factor = 1
 
-        # self.data_images = Dataset()
+        self.data_images = Dataset(images = {})
+        self.data_images.current_image_signal.current_image.connect(self.changeImage)
         # self.data_images.model_completed.connect(self.on_model_completed)
 
         self.setWindowTitle("MOLInA")
@@ -82,12 +89,11 @@ class MainWindow(QMainWindow):
         self.splitter =  QSplitter(self)
         self.toolbar_main = QToolBar()
         
-        
         self.left_widget = QWidget()
         self.left_widget_layout = QVBoxLayout(self.left_widget)
         self.toolbar_zoom = QToolBar()
         self.file_widget = FileManager(self)
-        self.file_widget.itemSelected.connect(self.onFileManagerItemSelected)
+        self.file_widget.itemSelected.connect(self.data_images.change_current_image)
 
         self.splitter.addWidget(self.file_widget)
 
@@ -138,6 +144,7 @@ class MainWindow(QMainWindow):
         self.button_save = QPushButton("Save")
         self.toolbar_main.addWidget(self.button_save)
 
+        # TODO: when click on right mouse button give list of current cache 
         self.button_left = QToolButton()
         self.button_left.setIcon(QIcon(RESOURCES_PATH.filePath("left_button.png")))
         self.toolbar_main.addWidget(self.button_left)
@@ -164,10 +171,28 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.widget)
         self.showMaximized()
 
-    def onFileManagerItemSelected(self, path: str):
-        self.pixmap = self.loadImage(path)
+    def changeImage(self, image: npt.NDArray) -> None:
+        self.scale_factor = 1
+        
+        if image.ndim == 3:  
+            h, w, ch = image.shape
+            bytes_per_line = ch * w
+            if image.shape[2] == 4:
+                q_image = QImage(image.data, w, h, bytes_per_line, QImage.Format_RGBA8888)
+            elif image.shape[2] == 3:
+                q_image = QImage(image.data, w, h, bytes_per_line, QImage.Format_RGB888)
+        elif image.ndim == 2:  
+            h, w = image.shape
+            q_image = QImage(image.data, w, h, w, QImage.Format_Grayscale8)
+        else:
+            raise ValueError("Unexpected array dimension")
+        
+        if q_image.isNull():
+            ValueError("Unsupported array shape for QPixmap conversion")
+
+        self.pixmap = QPixmap.fromImage(q_image)
         if self.pixmap:
-            self.image_widget.setPixmap(self.pixmap)
+            self.fitImage()
 
     def openImage(self) -> None:
         options = QFileDialog.Options()
@@ -177,28 +202,24 @@ class MainWindow(QMainWindow):
 
         if file_dialog.exec_():
             selected_file = file_dialog.selectedFiles()[0]
-            self.pixmap = self.loadImage(selected_file)
+            self.pixmap = QPixmap(selected_file)
             if self.pixmap:
-                self.image_widget.setPixmap(self.pixmap)
+                self.fitImage()
                 # self.data_images.setImage(self.pixmap)
 
-    def loadImage(self, file_path: str) -> QPixmap:
-        try:
-            self.pixmap = QPixmap(file_path)
-            if self.pixmap.height() >= self.pixmap.width():
-                self.pixmap = self.pixmap.scaledToHeight(self.image_widget.height())
-                # if picture is still out of boundaries
-                if self.pixmap.width() >= self.image_widget.width():
-                    self.pixmap = self.pixmap.scaledToWidth(self.image_widget.width())
-            else:
+    def fitImage(self):
+        if self.pixmap.height() >= self.pixmap.width():
+            self.pixmap = self.pixmap.scaledToHeight(self.image_widget.height())
+            # if picture is still out of boundaries
+            if self.pixmap.width() >= self.image_widget.width():
                 self.pixmap = self.pixmap.scaledToWidth(self.image_widget.width())
-                # if picture is still out of boundaries
-                if self.pixmap.height() >= self.image_widget.height():
-                    self.pixmap = self.pixmap.scaledToHeight(self.image_widget.height())
-
-        except Exception as e:
-            print(f"Error loading image: {e}")
-        return self.pixmap
+        else:
+            self.pixmap = self.pixmap.scaledToWidth(self.image_widget.width())
+            # if picture is still out of boundaries
+            if self.pixmap.height() >= self.image_widget.height():
+                self.pixmap = self.pixmap.scaledToHeight(self.image_widget.height())
+        
+        self.image_widget.setPixmap(self.pixmap)
 
     def setColor(self, widget: QWidget, color: QColor) -> None:
         widget.setAutoFillBackground(True)

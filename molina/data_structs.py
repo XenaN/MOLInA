@@ -1,49 +1,35 @@
 '''MolScribe functionality'''
 
 #%% Imports
+import json
+from pathlib import Path
 
 import torch, cv2
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, List, Dict, Optional
+import numpy.typing as npt
 
 import numpy as np
+from PySide6.QtCore import QObject, Signal
 
 from molscribe import MolScribe
-
-
-
-#%% Functions
-
-# TODO: we do not need PIL here, read via cv2 and remove this function
-#def arrayToCV2(self, image: Image) -> np.array:
-#    '''Transforms array Image to CV2 format'''
-#    
-#    return cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-
-
-@dataclass
-class ImagePaths():
-    '''Stores image and annotation paths'''
-    
-    path_image: str
-    '''Path to the image file'''
-    path_annotation: str
-    '''Path to the annotation file'''
 
 
 @dataclass
 class ImageData():
     '''Stores info on molecule image and its annotation'''
     
-    image_paths: ImagePaths
-    '''Paths to the image files'''
+    path_image: str
+    '''Path to the image file'''
+    path_annotation: str
+    '''Path to the annotation file'''
     image: np.array
     '''Numpy-array representation of the image'''
-    atoms: list # define type more precisely (list of tuples of 2 floats and strs? or better specifical data structure)
-    '''List of recognized atoms and their parameters'''
-    bonds: list # define type more precisely (list of tuples of 2 ints and str? or better specifical data structure)
-    '''List of recognized bonds and their parameters'''
+    # atoms: list # define type more precisely (list of tuples of 2 floats and strs? or better specifical data structure)
+    # '''List of recognized atoms and their parameters'''
+    # bonds: list # define type more precisely (list of tuples of 2 ints and str? or better specifical data structure)
+    # '''List of recognized bonds and their parameters'''
     
     def run_molscribe(self) -> None:
         '''Annotates image via MolScribe'''
@@ -64,45 +50,54 @@ class ImageData():
         # return
 
 
-def image_data_from_image_file(path: str) -> ImageData:
-    '''Generates ImageData object from image file'''
-    # check file formats
-    
-    # generate paths
-    
-    # read image (no exceptions if unreadable, image, atoms, and bonds are empty)
-    
-    # read annotation (ignore if unreadable)
-    
-    # prepare atoms and bonds data structures
-    
-    # construct the object
-    pass
-    # return
-
+class ImageSignals(QObject):
+    current_image = Signal(object)
 
 @dataclass
 class Dataset():
     '''Represents list of molecular images forming one dataset'''
-    
-    images: List[ImagePaths]
-    '''List of images forming the dataset'''
-    current_image: ImageData
-    '''Image which is viewed in GUI'''
-    num_images: int
+
+    current_image: ImageSignals = field(default=None, init=False)
+
+    images: Dict[str, ImageData] # Dict поддерживает insertion order
+    '''Dictionary of images forming the dataset'''
+    num_images: int = 10
     '''Total number of images in dataset'''
-    current_image_idx: int = 0
+    # current_image_idx: int = 0
     '''Index of the current image'''
+
+    def __post_init__(self):
+        self.current_image_signal = ImageSignals()
+    #     self.current_image = self.images[self.current_image_idx]
+
+    def open_image(self, path: str):
+        image = cv2.imread(path, cv2.IMREAD_UNCHANGED) 
+        return image
     
+    def check_annotation(self, image: ImageData):
+        if image.path_annotation.is_file():
+            with open(image.path_annotation) as f:
+                annotation = json.load(f)
+            return annotation
+        else:
+            return {}
     
-    # HINT: possibly good idea to make __post_init__ and do not init current_image,
-    #       so that it will be generated from self.images and self.current_image_idx
-    
-    
-    def change_current_image(self, idx: int) -> None:
-        '''Changes current image to another one by give idx'''
-        pass
-        # return
+    def change_current_image(self, path: str) -> None:
+        '''Changes current image'''
+        if path not in self.images:
+            image = self.open_image(path)
+            annotation_path = Path.joinpath(Path(path).parent.resolve(),
+                                            Path(path).stem + '.json')
+            self.images[path] = ImageData(path, 
+                                        annotation_path,
+                                        image)
+            if len(self.images) > 10:
+                oldest_key = list(self.images.keys())[0]
+                self.images.pop(oldest_key)
+
+        self.current_image_signal.current_image.emit(self.images[path].image)
+        
+
 
 
 # HINT: next two functions possibly require additional code decomposition
