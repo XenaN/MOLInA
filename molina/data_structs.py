@@ -26,10 +26,10 @@ class ImageData():
     '''Path to the annotation file'''
     image: np.array
     '''Numpy-array representation of the image'''
-    # atoms: list # define type more precisely (list of tuples of 2 floats and strs? or better specifical data structure)
-    # '''List of recognized atoms and their parameters'''
-    # bonds: list # define type more precisely (list of tuples of 2 ints and str? or better specifical data structure)
-    # '''List of recognized bonds and their parameters'''
+    atoms: Optional[List[dict[str, float]]]  = field(default_factory=list) # define type more precisely (list of tuples of 2 floats and strs? or better specifical data structure)
+    '''List of recognized atoms and their parameters'''
+    bonds: Optional[List[dict[str, Any]]]  = field(default_factory=list)# define type more precisely (list of tuples of 2 ints and str? or better specifical data structure)
+    '''List of recognized bonds and their parameters'''
     
     def run_molscribe(self) -> None:
         '''Annotates image via MolScribe'''
@@ -52,12 +52,11 @@ class ImageData():
 
 class ImageSignals(QObject):
     current_image = Signal(object)
+    current_annotation = Signal(object)
 
 @dataclass
 class Dataset():
     '''Represents list of molecular images forming one dataset'''
-
-    current_image: ImageSignals = field(default=None, init=False)
 
     images: Dict[str, ImageData] # Dict поддерживает insertion order
     '''Dictionary of images forming the dataset'''
@@ -74,13 +73,13 @@ class Dataset():
         image = cv2.imread(path, cv2.IMREAD_UNCHANGED) 
         return image
     
-    def check_annotation(self, image: ImageData):
-        if image.path_annotation.is_file():
-            with open(image.path_annotation) as f:
+    def check_annotation(self, annotation_path: str):
+        if annotation_path.is_file():
+            with open(annotation_path) as f:
                 annotation = json.load(f)
             return annotation
         else:
-            return {}
+            return
     
     def change_current_image(self, path: str) -> None:
         '''Changes current image'''
@@ -88,14 +87,25 @@ class Dataset():
             image = self.open_image(path)
             annotation_path = Path.joinpath(Path(path).parent.resolve(),
                                             Path(path).stem + '.json')
-            self.images[path] = ImageData(path, 
-                                        annotation_path,
-                                        image)
+            annotation = self.check_annotation(annotation_path)
+            if annotation:
+                self.images[path] = ImageData(path, 
+                                              annotation_path,
+                                              image,
+                                              annotation["atoms"], 
+                                              annotation["bonds"])
+            else:
+                self.images[path] = ImageData(path,
+                                              annotation_path,
+                                              image)
             if len(self.images) > 10:
                 oldest_key = list(self.images.keys())[0]
                 self.images.pop(oldest_key)
 
         self.current_image_signal.current_image.emit(self.images[path].image)
+        self.current_image_signal.current_annotation.emit({"atoms:": self.images[path].atoms,
+                                                          "bonds": self.images[path].bonds})
+        
         
 
 

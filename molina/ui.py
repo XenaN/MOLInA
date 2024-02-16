@@ -1,7 +1,7 @@
 ''''''
-import json
+import json, os
 
-from typing import List, Dict
+from typing import List, Dict, Any
 import numpy.typing as npt
 
 from PySide6.QtCore import (
@@ -81,6 +81,7 @@ class MainWindow(QMainWindow):
 
         self.data_images = Dataset(images = {})
         self.data_images.current_image_signal.current_image.connect(self.changeImage)
+        self.data_images.current_image_signal.current_annotation.connect(self.changeAnnotation)
         # self.data_images.model_completed.connect(self.on_model_completed)
 
         self.setWindowTitle("MOLInA")
@@ -90,7 +91,7 @@ class MainWindow(QMainWindow):
         self.toolbar_main = QToolBar()
         
         self.left_widget = QWidget()
-        self.left_widget_layout = QVBoxLayout(self.left_widget)
+        self.image_widget_layout = QVBoxLayout(self.left_widget)
         self.toolbar_zoom = QToolBar()
         self.file_widget = FileManager(self)
         self.file_widget.itemSelected.connect(self.data_images.change_current_image)
@@ -110,10 +111,10 @@ class MainWindow(QMainWindow):
         self.button_zoom_out.clicked.connect(self.zoomOut)
         self.toolbar_zoom.addWidget(self.button_zoom_out)
 
-        self.left_widget_layout.addWidget(self.toolbar_zoom)
+        self.image_widget_layout.addWidget(self.toolbar_zoom)
         
         self.image_widget = QLabel(self.splitter)
-        self.left_widget_layout.addWidget(self.image_widget)
+        self.image_widget_layout.addWidget(self.image_widget)
         self.image_widget.setMinimumSize(200, 200)
         self.image_widget.setSizePolicy(
             QSizePolicy.Policy.Expanding,
@@ -125,13 +126,13 @@ class MainWindow(QMainWindow):
 
         self.splitter.addWidget(self.left_widget)
 
-        self.right_widget = QTextEdit(self.splitter)
-        self.right_widget.setMinimumSize(200, 200)
-        self.setColor(self.right_widget, COLOR_BACKGROUND_WIDGETS)
-        self.right_widget.setLineWrapMode(QTextEdit.WidgetWidth)
-        self.right_widget.setReadOnly(True)
+        self.text_widget = QTextEdit(self.splitter)
+        self.text_widget.setMinimumSize(200, 200)
+        self.setColor(self.text_widget, COLOR_BACKGROUND_WIDGETS)
+        self.text_widget.setLineWrapMode(QTextEdit.WidgetWidth)
+        self.text_widget.setReadOnly(True)
 
-        self.splitter.addWidget(self.right_widget)
+        self.splitter.addWidget(self.text_widget)
 
         self.splitter.setStretchFactor(0, 1)
         self.splitter.setStretchFactor(1, 10)
@@ -226,11 +227,15 @@ class MainWindow(QMainWindow):
         palette = widget.palette()
         palette.setColor(QPalette.Window, color)
         widget.setPalette(palette)
+    
+    def changeAnnotation(self, annotation: Dict[str, List[Any]]):
+        annotation_json = json.dumps(annotation, indent=4, sort_keys=False)
+        self.text_widget.setText(annotation_json)
 
     def onModelCompleted(self, model_result: Dict) -> None:
         if model_result:
             model_result_json = json.dumps(model_result, indent=4, sort_keys=True)
-            self.right_widget.setPlainText(model_result_json)
+            self.text_widget.setPlainText(model_result_json)
     
     def resizeEvent(self, event) -> None:
         self.setPixmapSize()   
