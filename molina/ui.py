@@ -10,6 +10,8 @@ from PySide6.QtCore import (
     QDir, 
     Signal, 
     QModelIndex,
+    QFile, 
+    QFileInfo
 )
 from PySide6.QtWidgets import (
     QToolButton,
@@ -66,12 +68,22 @@ class FileManager(QWidget):
         self.file_layout.addWidget(self.file_view)
 
         #TODO: don't emit signal when it is not
-
         self.file_view.clicked.connect(self.onClicked)
-
+        self.file_view.doubleClicked.connect(self.onDoubleClicked)
+    
     def onClicked(self, index: QModelIndex):
+        path = self.file_model.filePath(index)
+        if QFileInfo(path).isDir():
+            if self.file_view.isExpanded(index):
+                self.file_view.collapse(index)
+            else:
+                self.file_view.expand(index)
+
+    def onDoubleClicked(self, index: QModelIndex):
         path = self.sender().model().filePath(index)
-        self.itemSelected.emit(path)
+        if QFile(path).exists() and not QFileInfo(path).isDir():
+            if path.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.bmp')):
+                self.itemSelected.emit(path)
 
 
 class MainWindow(QMainWindow):
