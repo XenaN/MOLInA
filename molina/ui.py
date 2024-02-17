@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
     QFileSystemModel,
     QTreeView,
     QAbstractItemView,
+    QScrollArea,
 )
 from PySide6.QtGui import (
     QPalette, 
@@ -67,7 +68,6 @@ class FileManager(QWidget):
 
         self.file_layout.addWidget(self.file_view)
 
-        #TODO: don't emit signal when it is not
         self.file_view.clicked.connect(self.onClicked)
         self.file_view.doubleClicked.connect(self.onDoubleClicked)
     
@@ -102,8 +102,8 @@ class MainWindow(QMainWindow):
         self.splitter =  QSplitter(self)
         self.toolbar_main = QToolBar()
         
-        self.left_widget = QWidget()
-        self.image_widget_layout = QVBoxLayout(self.left_widget)
+        self.central_widget = QWidget()
+        self.image_widget_layout = QVBoxLayout(self.central_widget)
         self.toolbar_zoom = QToolBar()
         self.file_widget = FileManager(self)
         self.file_widget.itemSelected.connect(self.data_images.change_current_image)
@@ -124,19 +124,26 @@ class MainWindow(QMainWindow):
         self.toolbar_zoom.addWidget(self.button_zoom_out)
 
         self.image_widget_layout.addWidget(self.toolbar_zoom)
-        
+
         self.image_widget = QLabel(self.splitter)
-        self.image_widget_layout.addWidget(self.image_widget)
+        self.image_widget.setAlignment(Qt.AlignCenter)
         self.image_widget.setMinimumSize(200, 200)
-        self.image_widget.setSizePolicy(
-            QSizePolicy.Policy.Expanding,
-            QSizePolicy.Policy.Expanding
-        )
+        # self.image_widget.setSizePolicy(
+        #     QSizePolicy.Policy.Expanding,
+        #     QSizePolicy.Policy.Expanding
+        # )
         self.setColor(self.image_widget, COLOR_BACKGROUND_WIDGETS)
-        self.image_widget.updateGeometry()
+        # self.image_widget.updateGeometry()
         self.pixmap = None
 
-        self.splitter.addWidget(self.left_widget)
+        self.scrollArea = QScrollArea(self)
+        self.scrollArea.setWidgetResizable(True)
+        self.scrollArea.setWidget(self.image_widget)
+        self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.scrollArea.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+
+        self.image_widget_layout.addWidget(self.scrollArea)
+        self.splitter.addWidget(self.central_widget)
 
         self.text_widget = QTextEdit(self.splitter)
         self.text_widget.setMinimumSize(200, 200)
@@ -218,7 +225,6 @@ class MainWindow(QMainWindow):
             self.pixmap = QPixmap(selected_file)
             if self.pixmap:
                 self.fitImage()
-                # self.data_images.setImage(self.pixmap)
 
     def fitImage(self):
         if self.pixmap.height() >= self.pixmap.width():
@@ -255,9 +261,8 @@ class MainWindow(QMainWindow):
     def setPixmapSize(self) -> None: 
         if not self.pixmap:
             return
-        size = self.image_widget.size()
         self.image_widget.setPixmap(self.pixmap.scaled(
-            self.scale_factor * size,
+            self.scale_factor * self.pixmap.size(),
             Qt.KeepAspectRatio))
 
     def zoomIn(self) -> None:
@@ -271,7 +276,7 @@ class MainWindow(QMainWindow):
     def resizeImage(self) -> None:
         if not self.pixmap:
             return
-        size = self.image_widget.size()
-        scaled_pixmap = self.pixmap.scaled(self.scale_factor * size, Qt.KeepAspectRatio)
+        scaled_pixmap = self.pixmap.scaled(self.scale_factor * self.pixmap.size(), Qt.KeepAspectRatio)
         self.image_widget.setPixmap(scaled_pixmap)
+        self.image_widget.setMinimumSize(scaled_pixmap.size())
     
