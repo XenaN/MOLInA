@@ -11,7 +11,9 @@ from PySide6.QtCore import (
     Signal, 
     QModelIndex,
     QFile, 
-    QFileInfo
+    QFileInfo,
+    QPoint, 
+    QLine,
 )
 from PySide6.QtWidgets import (
     QToolButton,
@@ -23,6 +25,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
     QVBoxLayout,
+    QStackedLayout,
     QWidget,
     QSplitter,
     QTextEdit,
@@ -37,6 +40,8 @@ from PySide6.QtGui import (
     QPixmap,
     QIcon,
     QImage,
+    QPainter, 
+    QPen
 )
 
 from molina.data_structs import Dataset
@@ -86,6 +91,42 @@ class FileManager(QWidget):
                 self.itemSelected.emit(path)
 
 
+class DrawingWidget(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # self.setAttribute(Qt.WA_TransparentForMouseEvents)  
+        self.lines = []
+        self.points = []
+        self.drawing_enabled = False
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        pen = QPen(Qt.red, 2)
+        painter.setPen(pen)
+
+        for line in self.lines:
+            painter.drawLine(line)
+
+        for point in self.points:
+            painter.drawPoint(point)
+
+    def addLine(self, line):
+        self.lines.append(line)
+        self.update()
+
+    def addPoint(self, point):
+        self.points.append(point)
+        self.update()
+
+    def setDrawingMode(self, enabled):
+        self.drawing_enabled = enabled
+    
+    def mousePressEvent(self, event):
+        if self.drawing_enabled:
+            self.addPoint(event.pos())
+            self.drawing_enabled = False 
+    
+
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super(MainWindow, self).__init__()
@@ -103,7 +144,9 @@ class MainWindow(QMainWindow):
         self.toolbar_main = QToolBar()
         
         self.central_widget = QWidget()
-        self.image_widget_layout = QVBoxLayout(self.central_widget)
+        self.image_widget_layout = QVBoxLayout()
+        self.central_widget.setLayout(self.image_widget_layout)
+
         self.toolbar_zoom = QToolBar()
         self.file_widget = FileManager(self)
         self.file_widget.itemSelected.connect(self.data_images.change_current_image)
@@ -125,20 +168,34 @@ class MainWindow(QMainWindow):
 
         self.image_widget_layout.addWidget(self.toolbar_zoom)
 
-        self.image_widget = QLabel(self.splitter)
-        self.image_widget.setAlignment(Qt.AlignCenter)
+        self.image_layout = QStackedLayout()
+        self.image_layout.setStackingMode(QStackedLayout.StackingMode.StackAll)
+        self.image_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.image_container = QWidget()
+        # self.setColor(self.image_container, QColor(150, 255, 150, 150))
+        self.image_container.setLayout(self.image_layout)
+
+        self.image_widget = QLabel()
+        # # self.image_widget.setAlignment(Qt.AlignCenter)
         self.image_widget.setMinimumSize(200, 200)
         # self.image_widget.setSizePolicy(
         #     QSizePolicy.Policy.Expanding,
         #     QSizePolicy.Policy.Expanding
         # )
-        self.setColor(self.image_widget, COLOR_BACKGROUND_WIDGETS)
-        # self.image_widget.updateGeometry()
+        self.setColor(self.image_widget, QColor(255, 150, 150, 150))
         self.pixmap = None
+
+        self.drawing_widget = DrawingWidget()
+        # self.drawing_widget.setGeometry(self.image_widget.geometry())
+        self.image_layout.addWidget(self.drawing_widget)
+        self.image_layout.addWidget(self.image_widget)
+        # # self.drawing_widget.setAlignment(Qt.AlignCenter)
+        self.setColor(self.drawing_widget, QColor(150, 150, 250, 100))
 
         self.scrollArea = QScrollArea(self)
         self.scrollArea.setWidgetResizable(True)
-        self.scrollArea.setWidget(self.image_widget)
+        self.scrollArea.setWidget(self.image_container)
         self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.scrollArea.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
@@ -280,3 +337,10 @@ class MainWindow(QMainWindow):
         self.image_widget.setPixmap(scaled_pixmap)
         self.image_widget.setMinimumSize(scaled_pixmap.size())
     
+    def keyPressEvent(self, event):
+        print("QMainWindow: key press event")
+        super().keyPressEvent(event)
+
+        if event.key() == Qt.Key_F:
+            self.drawing_widget.setDrawingMode(True)
+        
