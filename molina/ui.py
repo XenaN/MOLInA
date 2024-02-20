@@ -73,6 +73,8 @@ class FileManager(QWidget):
 
         self.file_layout.addWidget(self.file_view)
 
+        self.file_view.setEditTriggers(QTreeView.NoEditTriggers)
+
         self.file_view.clicked.connect(self.onClicked)
         self.file_view.doubleClicked.connect(self.onDoubleClicked)
     
@@ -94,14 +96,13 @@ class FileManager(QWidget):
 class DrawingWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        # self.setAttribute(Qt.WA_TransparentForMouseEvents)  
         self.lines = []
         self.points = []
         self.drawing_enabled = False
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        pen = QPen(Qt.red, 2)
+        pen = QPen(Qt.red, 5)
         painter.setPen(pen)
 
         for line in self.lines:
@@ -125,36 +126,18 @@ class DrawingWidget(QWidget):
         if self.drawing_enabled:
             self.addPoint(event.pos())
             self.drawing_enabled = False 
-    
 
-class MainWindow(QMainWindow):
-    def __init__(self) -> None:
-        super(MainWindow, self).__init__()
+
+class CentralWidget(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
         self.scale_factor = 1
+        self._pixmap = QPixmap()
 
-        self.data_images = Dataset(images = {})
-        self.data_images.current_image_signal.current_image.connect(self.changeImage)
-        self.data_images.current_image_signal.current_annotation.connect(self.changeAnnotation)
-        # self.data_images.model_completed.connect(self.on_model_completed)
-
-        self.setWindowTitle("MOLInA")
-
-        self.page_layout = QHBoxLayout()
-        self.splitter =  QSplitter(self)
-        self.toolbar_main = QToolBar()
-        
-        self.central_widget = QWidget()
-        self.image_widget_layout = QVBoxLayout()
-        self.central_widget.setLayout(self.image_widget_layout)
+        self.central_widget_layout = QVBoxLayout()
+        self.setLayout(self.central_widget_layout)
 
         self.toolbar_zoom = QToolBar()
-        self.file_widget = FileManager(self)
-        self.file_widget.itemSelected.connect(self.data_images.change_current_image)
-
-        self.splitter.addWidget(self.file_widget)
-
-        self.addToolBar(self.toolbar_main)
-        self.page_layout.addWidget(self.splitter)
 
         self.button_zoom_in = QToolButton()
         self.button_zoom_in.setIcon(QIcon(RESOURCES_PATH.filePath("plus.png")))
@@ -166,40 +149,97 @@ class MainWindow(QMainWindow):
         self.button_zoom_out.clicked.connect(self.zoomOut)
         self.toolbar_zoom.addWidget(self.button_zoom_out)
 
-        self.image_widget_layout.addWidget(self.toolbar_zoom)
+        self.central_widget_layout.addWidget(self.toolbar_zoom)
 
         self.image_layout = QStackedLayout()
         self.image_layout.setStackingMode(QStackedLayout.StackingMode.StackAll)
         self.image_layout.setContentsMargins(0, 0, 0, 0)
         
         self.image_container = QWidget()
-        # self.setColor(self.image_container, QColor(150, 255, 150, 150))
         self.image_container.setLayout(self.image_layout)
 
         self.image_widget = QLabel()
-        # # self.image_widget.setAlignment(Qt.AlignCenter)
+        self.image_widget.setAlignment(Qt.AlignCenter)
         self.image_widget.setMinimumSize(200, 200)
-        # self.image_widget.setSizePolicy(
-        #     QSizePolicy.Policy.Expanding,
-        #     QSizePolicy.Policy.Expanding
-        # )
-        self.setColor(self.image_widget, QColor(255, 150, 150, 150))
-        self.pixmap = None
 
         self.drawing_widget = DrawingWidget()
-        # self.drawing_widget.setGeometry(self.image_widget.geometry())
         self.image_layout.addWidget(self.drawing_widget)
         self.image_layout.addWidget(self.image_widget)
-        # # self.drawing_widget.setAlignment(Qt.AlignCenter)
-        self.setColor(self.drawing_widget, QColor(150, 150, 250, 100))
 
-        self.scrollArea = QScrollArea(self)
+        self.scrollArea = QScrollArea()
         self.scrollArea.setWidgetResizable(True)
         self.scrollArea.setWidget(self.image_container)
         self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.scrollArea.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
-        self.image_widget_layout.addWidget(self.scrollArea)
+        self.central_widget_layout.addWidget(self.scrollArea)
+
+    def zoomIn(self) -> None:
+      self.scale_factor *= 1.1
+      self.resizeImage()
+      
+    def zoomOut(self) -> None:
+      self.scale_factor /= 1.1
+      self.resizeImage()
+    
+    def resizeImage(self) -> None:
+        if not self._pixmap.isNull():
+            scaled_pixmap = self._pixmap.scaled(self.scale_factor * self._pixmap.size(), Qt.KeepAspectRatio)
+            self.image_widget.setPixmap(scaled_pixmap)
+            self.image_widget.setMinimumSize(scaled_pixmap.size())
+    
+    def setPixmapSize(self) -> None: 
+        if not self._pixmap.isNull():
+            self.image_widget.setPixmap(self._pixmap.scaled(
+                self.scale_factor * self._pixmap.size(),
+                Qt.KeepAspectRatio))
+        
+    def fitImage(self):
+        if self._pixmap.height() >= self._pixmap.width():
+            self._pixmap = self._pixmap.scaledToHeight(self.image_widget.height())
+            # if picture is still out of boundaries
+            if self._pixmap.width() >= self.image_widget.width():
+                self._pixmap = self._pixmap.scaledToWidth(self.image_widget.width())
+        else:
+            self._pixmap = self._pixmap.scaledToWidth(self.image_widget.width())
+            # if picture is still out of boundaries
+            if self._pixmap.height() >= self.image_widget.height():
+                self._pixmap = self._pixmap.scaledToHeight(self.image_widget.height())
+        
+        self.image_widget.setPixmap(self._pixmap)
+    
+    def setCentralPixmap(self, image: QPixmap):
+        self._pixmap = image
+        if not self._pixmap.isNull():
+            self.fitImage()
+
+
+class MainWindow(QMainWindow):
+    def __init__(self) -> None:
+        super(MainWindow, self).__init__()
+
+        self.setWindowTitle("MOLInA")
+
+        self.data_images = Dataset(images = {})
+        self.data_images.current_image_signal.current_image.connect(self.changeImage)
+        self.data_images.current_image_signal.current_annotation.connect(self.changeAnnotation)
+        # self.data_images.model_completed.connect(self.on_model_completed)
+
+        self.page_layout = QHBoxLayout()
+        self.splitter =  QSplitter(self)
+        self.toolbar_main = QToolBar()
+        
+        self.central_widget = CentralWidget()
+        self.setColor(self.central_widget, COLOR_BACKGROUND_WIDGETS)
+
+        self.file_widget = FileManager(self)
+        self.file_widget.itemSelected.connect(self.data_images.change_current_image)
+
+        self.splitter.addWidget(self.file_widget)
+
+        self.addToolBar(self.toolbar_main)
+        self.page_layout.addWidget(self.splitter)
+
         self.splitter.addWidget(self.central_widget)
 
         self.text_widget = QTextEdit(self.splitter)
@@ -267,9 +307,7 @@ class MainWindow(QMainWindow):
         if q_image.isNull():
             ValueError("Unsupported array shape for QPixmap conversion")
 
-        self.pixmap = QPixmap.fromImage(q_image)
-        if self.pixmap:
-            self.fitImage()
+        self.central_widget.setCentralPixmap(QPixmap.fromImage(q_image))
 
     def openImage(self) -> None:
         options = QFileDialog.Options()
@@ -279,29 +317,7 @@ class MainWindow(QMainWindow):
 
         if file_dialog.exec_():
             selected_file = file_dialog.selectedFiles()[0]
-            self.pixmap = QPixmap(selected_file)
-            if self.pixmap:
-                self.fitImage()
-
-    def fitImage(self):
-        if self.pixmap.height() >= self.pixmap.width():
-            self.pixmap = self.pixmap.scaledToHeight(self.image_widget.height())
-            # if picture is still out of boundaries
-            if self.pixmap.width() >= self.image_widget.width():
-                self.pixmap = self.pixmap.scaledToWidth(self.image_widget.width())
-        else:
-            self.pixmap = self.pixmap.scaledToWidth(self.image_widget.width())
-            # if picture is still out of boundaries
-            if self.pixmap.height() >= self.image_widget.height():
-                self.pixmap = self.pixmap.scaledToHeight(self.image_widget.height())
-        
-        self.image_widget.setPixmap(self.pixmap)
-
-    def setColor(self, widget: QWidget, color: QColor) -> None:
-        widget.setAutoFillBackground(True)
-        palette = widget.palette()
-        palette.setColor(QPalette.Window, color)
-        widget.setPalette(palette)
+            self.central_widget.setCentralPixmap(QPixmap(selected_file))
     
     def changeAnnotation(self, annotation: Dict[str, List[Any]]):
         annotation_json = json.dumps(annotation, indent=4, sort_keys=False)
@@ -313,34 +329,17 @@ class MainWindow(QMainWindow):
             self.text_widget.setPlainText(model_result_json)
     
     def resizeEvent(self, event) -> None:
-        self.setPixmapSize()   
+        self.central_widget.setPixmapSize()   
     
-    def setPixmapSize(self) -> None: 
-        if not self.pixmap:
-            return
-        self.image_widget.setPixmap(self.pixmap.scaled(
-            self.scale_factor * self.pixmap.size(),
-            Qt.KeepAspectRatio))
-
-    def zoomIn(self) -> None:
-      self.scale_factor *= 1.1
-      self.resizeImage()
-      
-    def zoomOut(self) -> None:
-      self.scale_factor /= 1.1
-      self.resizeImage()
-
-    def resizeImage(self) -> None:
-        if not self.pixmap:
-            return
-        scaled_pixmap = self.pixmap.scaled(self.scale_factor * self.pixmap.size(), Qt.KeepAspectRatio)
-        self.image_widget.setPixmap(scaled_pixmap)
-        self.image_widget.setMinimumSize(scaled_pixmap.size())
+    def setColor(self, widget: QWidget, color: QColor) -> None:
+        widget.setAutoFillBackground(True)
+        palette = widget.palette()
+        palette.setColor(QPalette.Window, color)
+        widget.setPalette(palette)
     
     def keyPressEvent(self, event):
-        print("QMainWindow: key press event")
         super().keyPressEvent(event)
 
         if event.key() == Qt.Key_F:
-            self.drawing_widget.setDrawingMode(True)
-        
+            self.central_widget.drawing_widget.setDrawingMode(True)
+    
