@@ -95,6 +95,41 @@ class FileManager(QWidget):
                 self.itemSelected.emit(path)
 
 
+class Action:
+    def __init__(self, widget):
+        self.widget = widget
+        self.action_history = []
+        self.max_actions = 15
+
+    def addAction(self, action, action_type):
+        if len(self.action_history) >= self.max_actions:
+            self.action_history.pop(0)
+        self.action_history.append({'type': action_type, 'data': action})
+
+    def undo(self):
+        if self.action_history:
+            last_action = self.action_history.pop()
+            action_type = last_action['type']
+            data = last_action['data']
+
+            if action_type == 'add_point':
+                # Undo add_point by removing the last point
+                self.widget.deletePoint(False)
+                self.widget.update()
+            elif action_type == 'delete_point':
+                # Undo delete_point by re-adding the point
+                self.widget.addPoint(data, False)
+                self.widget.update()
+            elif action_type == 'add_line':
+                # Undo add_line by removing the last line
+                self.widget.deleteLine(False)
+                self.widget.update()
+            elif action_type == 'delete_line':
+                # Undo delete_line by re-adding the line
+                self.widget.addLine(data, False)
+                self.widget.update()
+
+
 class DrawingWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -104,6 +139,8 @@ class DrawingWidget(QWidget):
         self._zoom_factor = 1.0
         self._original_coordinate = {"lines": [],
                                      "points": []}
+        self.setFocusPolicy(Qt.StrongFocus)
+        self.action_manager = Action(self)
 
     def paintEvent(self, event: QPaintEvent) -> None:
         painter = QPainter(self)
@@ -119,15 +156,33 @@ class DrawingWidget(QWidget):
         # painter.setBrush(QColor(150, 150, 100, 100))
         # painter.drawRect(self.rect())
 
-    def addLine(self, line: QLine) -> None:
+    def addLine(self, line: QLine, flag_undo: bool = True) -> None:
         # self._original_coordinate["lines"].append(line / self._zoom_factor)
         self._lines.append(line)
+        if flag_undo:
+            self.action_manager.addAction(line, "add_line")
+        self.update()
+    
+    def deleteLine(self, flag_undo: bool = True) -> None:
+        # self._original_coordinate["lines"].append(line / self._zoom_factor)
+        last_line = self._lines.pop()
+        if flag_undo:
+            self.action_manager.addAction(last_line, "delete_line")
         self.update()
 
-    def addPoint(self, point: QPoint) -> None:
+    def addPoint(self, point: QPoint, flag_undo: bool = True) -> None:
         self._original_coordinate["points"].append(QPoint(
             point.x() * self._zoom_factor, point.y() / self._zoom_factor))
+        if flag_undo:
+            self.action_manager.addAction(point, "add_point")
         self._points.append(point)
+        self.update()
+    
+    def deletePoint(self, flag_undo: bool = True) -> None:
+        self._original_coordinate["points"].pop()
+        last_point = self._points.pop()
+        if flag_undo:
+            self.action_manager.addAction(last_point, "delete_point")
         self.update()
 
     def setDrawingMode(self, enabled: bool) -> None:
@@ -153,6 +208,15 @@ class DrawingWidget(QWidget):
         if self._drawing_enabled:
             self.addPoint(event.pos())
             self._drawing_enabled = False 
+    
+    def keyPressEvent(self, event: QPaintEvent):
+        super().keyPressEvent(event)
+        
+        if event.key() == Qt.Key_Z and event.modifiers() == Qt.ControlModifier:
+            self.action_manager.undo()
+
+        elif event.key() == Qt.Key_F and event.modifiers() == Qt.ControlModifier:
+            self.setDrawingMode(True)
 
 
 class CentralWidget(QWidget):
@@ -193,6 +257,7 @@ class CentralWidget(QWidget):
         self.containerLayout = QHBoxLayout(self.containerWidget)
         self.containerLayout.setContentsMargins(0, 0, 0, 0)      
         self.drawing_widget = DrawingWidget()
+        self.drawing_widget.setFocus()
         self.containerLayout.addWidget(self.drawing_widget, alignment=Qt.AlignCenter)
 
         self.image_layout.addWidget(self.containerWidget)
@@ -386,10 +451,4 @@ class MainWindow(QMainWindow):
         palette = widget.palette()
         palette.setColor(QPalette.Window, color)
         widget.setPalette(palette)
-    
-    def keyPressEvent(self, event: QPaintEvent):
-        super().keyPressEvent(event)
-
-        if event.key() == Qt.Key_F:
-            self.central_widget.drawing_widget.setDrawingMode(True)
     
