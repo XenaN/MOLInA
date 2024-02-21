@@ -6,7 +6,8 @@ import numpy.typing as npt
 
 from PySide6.QtCore import (
     Qt, 
-    QSize, 
+    QSize,
+    QRect, 
     QDir, 
     Signal, 
     QModelIndex,
@@ -41,7 +42,8 @@ from PySide6.QtGui import (
     QIcon,
     QImage,
     QPainter, 
-    QPen
+    QPen,
+    QPaintEvent,
 )
 
 from molina.data_structs import Dataset
@@ -78,7 +80,7 @@ class FileManager(QWidget):
         self.file_view.clicked.connect(self.onClicked)
         self.file_view.doubleClicked.connect(self.onDoubleClicked)
     
-    def onClicked(self, index: QModelIndex):
+    def onClicked(self, index: QModelIndex) -> None:
         path = self.file_model.filePath(index)
         if QFileInfo(path).isDir():
             if self.file_view.isExpanded(index):
@@ -86,7 +88,7 @@ class FileManager(QWidget):
             else:
                 self.file_view.expand(index)
 
-    def onDoubleClicked(self, index: QModelIndex):
+    def onDoubleClicked(self, index: QModelIndex) -> None:
         path = self.sender().model().filePath(index)
         if QFile(path).exists() and not QFileInfo(path).isDir():
             if path.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.bmp')):
@@ -96,42 +98,67 @@ class FileManager(QWidget):
 class DrawingWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.lines = []
-        self.points = []
-        self.drawing_enabled = False
+        self._lines = []
+        self._points = []
+        self._drawing_enabled = False
+        self._zoom_factor = 1.0
+        self._original_coordinate = {"lines": [],
+                                     "points": []}
 
-    def paintEvent(self, event):
+    def paintEvent(self, event: QPaintEvent) -> None:
         painter = QPainter(self)
         pen = QPen(Qt.red, 5)
         painter.setPen(pen)
 
-        for line in self.lines:
+        for line in self._lines:
             painter.drawLine(line)
 
-        for point in self.points:
+        for point in self._points:
             painter.drawPoint(point)
 
-    def addLine(self, line):
-        self.lines.append(line)
+        # painter.setBrush(QColor(150, 150, 100, 100))
+        # painter.drawRect(self.rect())
+
+    def addLine(self, line: QLine) -> None:
+        # self._original_coordinate["lines"].append(line / self._zoom_factor)
+        self._lines.append(line)
         self.update()
 
-    def addPoint(self, point):
-        self.points.append(point)
+    def addPoint(self, point: QPoint) -> None:
+        self._original_coordinate["points"].append(QPoint(
+            point.x() * self._zoom_factor, point.y() / self._zoom_factor))
+        self._points.append(point)
         self.update()
 
-    def setDrawingMode(self, enabled):
-        self.drawing_enabled = enabled
+    def setDrawingMode(self, enabled: bool) -> None:
+        self._drawing_enabled = enabled
     
-    def mousePressEvent(self, event):
-        if self.drawing_enabled:
+    def updateDrawScale(self) -> None:
+        for line in self._original_coordinate["lines"]:
+            pass
+
+        for i in range(len(self._original_coordinate["points"])):
+            point = self._original_coordinate["points"][i]
+            self._points[i].setX(point.x() * self._zoom_factor)
+            self._points[i].setY(point.y() * self._zoom_factor)
+    
+    def setZoomFactor(self, factor: float) -> None:
+        self._zoom_factor = factor
+        self.update()
+    
+    def getOriginalCoordinate(self) -> Dict:
+        return self._original_coordinate
+    
+    def mousePressEvent(self, event: QPaintEvent) -> None:
+        if self._drawing_enabled:
             self.addPoint(event.pos())
-            self.drawing_enabled = False 
+            self._drawing_enabled = False 
 
 
 class CentralWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.scale_factor = 1
+        self._scale_factor = 1
         self._pixmap = QPixmap()
 
         self.central_widget_layout = QVBoxLayout()
@@ -162,9 +189,16 @@ class CentralWidget(QWidget):
         self.image_widget.setAlignment(Qt.AlignCenter)
         self.image_widget.setMinimumSize(200, 200)
 
+        self.containerWidget = QWidget()
+        self.containerLayout = QHBoxLayout(self.containerWidget)
+        self.containerLayout.setContentsMargins(0, 0, 0, 0)      
         self.drawing_widget = DrawingWidget()
-        self.image_layout.addWidget(self.drawing_widget)
+        self.containerLayout.addWidget(self.drawing_widget, alignment=Qt.AlignCenter)
+
+        self.image_layout.addWidget(self.containerWidget)
         self.image_layout.addWidget(self.image_widget)
+        # self.setColor(self.drawing_widget, QColor(100, 250, 150, 100))
+        self.setColor(self.image_widget, COLOR_BACKGROUND_WIDGETS)
 
         self.scrollArea = QScrollArea()
         self.scrollArea.setWidgetResizable(True)
@@ -173,28 +207,37 @@ class CentralWidget(QWidget):
         self.scrollArea.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
         self.central_widget_layout.addWidget(self.scrollArea)
+    
+    def setScaleFactor(self, factor: float) -> None:
+        self._scale_factor = factor
+        self.drawing_widget.setZoomFactor(self._scale_factor)
 
     def zoomIn(self) -> None:
-      self.scale_factor *= 1.1
+      self._scale_factor *= 1.1
       self.resizeImage()
       
     def zoomOut(self) -> None:
-      self.scale_factor /= 1.1
+      self._scale_factor /= 1.1
       self.resizeImage()
     
     def resizeImage(self) -> None:
         if not self._pixmap.isNull():
-            scaled_pixmap = self._pixmap.scaled(self.scale_factor * self._pixmap.size(), Qt.KeepAspectRatio)
+            scaled_pixmap = self._pixmap.scaled(self._scale_factor * self._pixmap.size(), Qt.KeepAspectRatio)
+            
             self.image_widget.setPixmap(scaled_pixmap)
             self.image_widget.setMinimumSize(scaled_pixmap.size())
+            
+            self.drawing_widget.setZoomFactor(self._scale_factor)
+            self.drawing_widget.setFixedSize(scaled_pixmap.size())
+            self.drawing_widget.updateDrawScale()
     
     def setPixmapSize(self) -> None: 
         if not self._pixmap.isNull():
             self.image_widget.setPixmap(self._pixmap.scaled(
-                self.scale_factor * self._pixmap.size(),
+                self._scale_factor * self._pixmap.size(),
                 Qt.KeepAspectRatio))
         
-    def fitImage(self):
+    def fitImage(self) -> None:
         if self._pixmap.height() >= self._pixmap.width():
             self._pixmap = self._pixmap.scaledToHeight(self.image_widget.height())
             # if picture is still out of boundaries
@@ -208,11 +251,18 @@ class CentralWidget(QWidget):
         
         self.image_widget.setPixmap(self._pixmap)
     
-    def setCentralPixmap(self, image: QPixmap):
+    def setCentralPixmap(self, image: QPixmap) -> None:
         self._pixmap = image
         if not self._pixmap.isNull():
             self.fitImage()
+            self.drawing_widget.setFixedSize(self._pixmap.size())
 
+    def setColor(self, widget: QWidget, color: QColor) -> None:
+        widget.setAutoFillBackground(True)
+        palette = widget.palette()
+        palette.setColor(QPalette.Window, color)
+        widget.setPalette(palette)
+    
 
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
@@ -289,7 +339,7 @@ class MainWindow(QMainWindow):
         self.showMaximized()
 
     def changeImage(self, image: npt.NDArray) -> None:
-        self.scale_factor = 1
+        self.central_widget.setScaleFactor(1.0)
         
         if image.ndim == 3:  
             h, w, ch = image.shape
@@ -328,7 +378,7 @@ class MainWindow(QMainWindow):
             model_result_json = json.dumps(model_result, indent=4, sort_keys=True)
             self.text_widget.setPlainText(model_result_json)
     
-    def resizeEvent(self, event) -> None:
+    def resizeEvent(self, event: QPaintEvent) -> None:
         self.central_widget.setPixmapSize()   
     
     def setColor(self, widget: QWidget, color: QColor) -> None:
@@ -337,7 +387,7 @@ class MainWindow(QMainWindow):
         palette.setColor(QPalette.Window, color)
         widget.setPalette(palette)
     
-    def keyPressEvent(self, event):
+    def keyPressEvent(self, event: QPaintEvent):
         super().keyPressEvent(event)
 
         if event.key() == Qt.Key_F:
