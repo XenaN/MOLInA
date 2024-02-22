@@ -15,6 +15,7 @@ from PySide6.QtCore import (
     QFileInfo,
     QPoint, 
     QLine,
+    QThread,
 )
 from PySide6.QtWidgets import (
     QToolButton,
@@ -46,7 +47,7 @@ from PySide6.QtGui import (
     QPaintEvent,
 )
 
-from molina.data_structs import Dataset
+from molina.data_structs import Dataset, Worker
 
 
 COLOR_BACKGROUND_WIDGETS = QColor(250, 250, 250)
@@ -95,7 +96,7 @@ class FileManager(QWidget):
                 self.itemSelected.emit(path)
 
 
-class Action:
+class DrawingAction:
     def __init__(self, widget):
         self.widget = widget
         self.action_history = []
@@ -135,12 +136,12 @@ class DrawingWidget(QWidget):
         super().__init__(parent)
         self._lines = []
         self._points = []
-        self._drawing_enabled = False
         self._zoom_factor = 1.0
-        self._original_coordinate = {"lines": [],
-                                     "points": []}
+        self._drawing_enabled = False
+        self.action_manager = DrawingAction(self)
         self.setFocusPolicy(Qt.StrongFocus)
-        self.action_manager = Action(self)
+        self._original_coordinate = {"lines": [],
+                                     "points": []}        
 
     def paintEvent(self, event: QPaintEvent) -> None:
         painter = QPainter(self)
@@ -204,19 +205,26 @@ class DrawingWidget(QWidget):
     def getOriginalCoordinate(self) -> Dict:
         return self._original_coordinate
     
+    def cleanDrawingWidget(self):
+        self._lines = []
+        self._points = []
+        self._zoom_factor = 1.0
+        self._drawing_enabled = False
+        self.action_manager = DrawingAction(self)
+        self._original_coordinate = {"lines": [],
+                                     "points": []}
+    
     def mousePressEvent(self, event: QPaintEvent) -> None:
         if self._drawing_enabled:
             self.addPoint(event.pos())
-            self._drawing_enabled = False 
     
     def keyPressEvent(self, event: QPaintEvent):
         super().keyPressEvent(event)
-        
         if event.key() == Qt.Key_Z and event.modifiers() == Qt.ControlModifier:
             self.action_manager.undo()
 
-        elif event.key() == Qt.Key_F and event.modifiers() == Qt.ControlModifier:
-            self.setDrawingMode(True)
+        elif event.key() == Qt.Key_F:
+            self.setDrawingMode(not self._drawing_enabled)
 
 
 class CentralWidget(QWidget):
@@ -256,6 +264,7 @@ class CentralWidget(QWidget):
         self.containerWidget = QWidget()
         self.containerLayout = QHBoxLayout(self.containerWidget)
         self.containerLayout.setContentsMargins(0, 0, 0, 0)      
+        
         self.drawing_widget = DrawingWidget()
         self.drawing_widget.setFocus()
         self.containerLayout.addWidget(self.drawing_widget, alignment=Qt.AlignCenter)
@@ -321,24 +330,46 @@ class CentralWidget(QWidget):
         if not self._pixmap.isNull():
             self.fitImage()
             self.drawing_widget.setFixedSize(self._pixmap.size())
+            self.drawing_widget.cleanDrawingWidget()
 
     def setColor(self, widget: QWidget, color: QColor) -> None:
         widget.setAutoFillBackground(True)
         palette = widget.palette()
         palette.setColor(QPalette.Window, color)
         widget.setPalette(palette)
+
+    def runLoadAnimation(self):
+        #set disabled buttons
+        # show animation and run
+        pass
+
+    def stopLoadAnimation(self):
+        # set enabled buttons
+        # stop animation
+        pass
     
 
 class MainWindow(QMainWindow):
+    imagePathSelected = Signal(str)
     def __init__(self) -> None:
         super(MainWindow, self).__init__()
 
         self.setWindowTitle("MOLInA")
 
         self.data_images = Dataset(images = {})
+
+        self.thread = QThread()
+        self.worker = Worker(self.data_images)
+        self.worker.moveToThread(self.thread)
+        
+        self.thread.started.connect(self.worker.run)
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.worker.result.connect(self.onModelCompleted)
+
         self.data_images.current_image_signal.current_image.connect(self.changeImage)
         self.data_images.current_image_signal.current_annotation.connect(self.changeAnnotation)
-        # self.data_images.model_completed.connect(self.on_model_completed)
 
         self.page_layout = QHBoxLayout()
         self.splitter =  QSplitter(self)
@@ -346,6 +377,7 @@ class MainWindow(QMainWindow):
         
         self.central_widget = CentralWidget()
         self.setColor(self.central_widget, COLOR_BACKGROUND_WIDGETS)
+        # self.data_images.current_image_signal.model_completed.connect(self.central_widget.stopLoadAnimation)
 
         self.file_widget = FileManager(self)
         self.file_widget.itemSelected.connect(self.data_images.change_current_image)
@@ -395,9 +427,13 @@ class MainWindow(QMainWindow):
         self.toolbar_main.addWidget(self.button_current_model)
 
         self.button_predict = QPushButton("Predict")
-        # self.button_predict.pressed.connect(self.data_images.run_molscribe)
+        # self.button_predict.pressed.connect(self.data_images.run_molscribe_predict)
+        self.button_predict.pressed.connect(self.thread.start)
+        self.button_predict.pressed.connect(self.central_widget.runLoadAnimation)
         self.toolbar_main.addWidget(self.button_predict)
 
+        self.imagePathSelected.connect(self.data_images.change_current_image)
+          
         self.widget = QWidget()
         self.widget.setLayout(self.page_layout)
         self.setCentralWidget(self.widget)
@@ -432,7 +468,7 @@ class MainWindow(QMainWindow):
 
         if file_dialog.exec_():
             selected_file = file_dialog.selectedFiles()[0]
-            self.central_widget.setCentralPixmap(QPixmap(selected_file))
+            self.imagePathSelected.emit(selected_file)
     
     def changeAnnotation(self, annotation: Dict[str, List[Any]]):
         annotation_json = json.dumps(annotation, indent=4, sort_keys=False)
@@ -441,7 +477,9 @@ class MainWindow(QMainWindow):
     def onModelCompleted(self, model_result: Dict) -> None:
         if model_result:
             model_result_json = json.dumps(model_result, indent=4, sort_keys=True)
-            self.text_widget.setPlainText(model_result_json)
+            self.text_widget.setText(model_result_json)
+        self.thread.quit()
+        self.thread.wait()
     
     def resizeEvent(self, event: QPaintEvent) -> None:
         self.central_widget.setPixmapSize()   

@@ -16,6 +16,9 @@ from PySide6.QtCore import QObject, Signal
 from molscribe import MolScribe
 
 
+MOLSCRIBE = './models/molscribe_aux_1m.pth'
+
+
 @dataclass
 class ImageData():
     '''Stores info on molecule image and its annotation'''
@@ -33,14 +36,13 @@ class ImageData():
     
     def run_molscribe(self) -> None:
         '''Annotates image via MolScribe'''
-        # [optional] prepare data
-        
-        # run molscribe
-        
-        # update self.atoms and self.bonds
-        
-        pass
-        # return
+        image = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)
+        self.model = MolScribe(MOLSCRIBE, torch.device('cpu'))
+        result = self.model.predict_image(image, return_atoms_bonds=True, return_confidence = True)
+
+        if result:
+            self.atoms = result["atoms"]
+            self.bonds = result["bonds"]
     
     def save_annotation(self) -> None:
         '''Saves current annotation to the corresponding file'''
@@ -62,12 +64,11 @@ class Dataset():
     '''Dictionary of images forming the dataset'''
     num_images: int = 10
     '''Total number of images in dataset'''
-    # current_image_idx: int = 0
+    current_image: str = ''
     '''Index of the current image'''
 
     def __post_init__(self):
         self.current_image_signal = ImageSignals()
-    #     self.current_image = self.images[self.current_image_idx]
 
     def open_image(self, path: str):
         image = cv2.imread(path, cv2.IMREAD_UNCHANGED) 
@@ -81,6 +82,10 @@ class Dataset():
         else:
             return
     
+    def run_molscribe_predict(self):
+        self.images[self.current_image].run_molscribe()
+        return self.images[self.current_image]
+
     def change_current_image(self, path: str) -> None:
         '''Changes current image'''
         if path not in self.images:
@@ -101,13 +106,29 @@ class Dataset():
             if len(self.images) > 10:
                 oldest_key = list(self.images.keys())[0]
                 self.images.pop(oldest_key)
+        
+        self.current_image = path
 
         self.current_image_signal.current_image.emit(self.images[path].image)
         self.current_image_signal.current_annotation.emit({"atoms:": self.images[path].atoms,
                                                           "bonds": self.images[path].bonds})
         
         
+class Worker(QObject):
+    finished = Signal()
+    result = Signal(object)
 
+    def __init__(self, data):
+        super().__init__()
+        self.data = data
+
+    def run(self):
+        result = self.data.run_molscribe_predict()
+
+        self.result.emit(
+            {"atoms:": result.atoms, 
+             "bonds": result.bonds})
+        self.finished.emit()
 
 
 # HINT: next two functions possibly require additional code decomposition
