@@ -136,7 +136,7 @@ class DrawingWidget(QWidget):
         super().__init__(parent)
         self._lines = []
         self._points = []
-        self.temp_points = []
+        self.temp_line = None
         self._zoom_factor = 1.0
         self._drawing_line_enabled = False
         self._drawing_point_enabled = False
@@ -156,18 +156,22 @@ class DrawingWidget(QWidget):
         for point in self._points:
             painter.drawPoint(point)
 
+        if self.temp_line:
+            painter.drawLine(self.temp_line)
+
         # painter.setBrush(QColor(150, 150, 100, 100))
         # painter.drawRect(self.rect())
 
     def addLine(self, line: QLine, flag_undo: bool = True) -> None:
         self._original_coordinate["lines"].append(QLine(
             line.x1() / self._zoom_factor, 
-            line.x2() / self._zoom_factor,
             line.y1() / self._zoom_factor,
+            line.x2() / self._zoom_factor,
             line.y2() / self._zoom_factor))
         self._lines.append(line)
         if flag_undo:
             self.action_manager.addAction(line, "add_line")
+
         self.update()
     
     def deleteLine(self, flag_undo: bool = True) -> None:
@@ -201,15 +205,15 @@ class DrawingWidget(QWidget):
             raise TypeError()
     
     def updateDrawScale(self) -> None:
-        for line in self._original_coordinate["lines"]:
+        for i in range(len(self._original_coordinate["lines"])):
             line = self._original_coordinate["lines"][i]
             self._lines[i].setP1(QPoint(
-                line.P1.x() * self._zoom_factor,
-                line.P1.y() * self._zoom_factor))
+                line.p1().x() * self._zoom_factor,
+                line.p1().y() * self._zoom_factor))
             self._lines[i].setP2(QPoint(
-                line.P2.x() * self._zoom_factor,
-                line.P2.y() * self._zoom_factor))
-
+                line.p2().x() * self._zoom_factor,
+                line.p2().y() * self._zoom_factor))
+            
         for i in range(len(self._original_coordinate["points"])):
             point = self._original_coordinate["points"][i]
             self._points[i].setX(point.x() * self._zoom_factor)
@@ -225,7 +229,7 @@ class DrawingWidget(QWidget):
     def cleanDrawingWidget(self):
         self._lines = []
         self._points = []
-        self.temp_points = []
+        self.temp_line = None
         self._zoom_factor = 1.0
         self._drawing_line_enabled = False
         self._drawing_point_enabled = False
@@ -234,13 +238,21 @@ class DrawingWidget(QWidget):
                                      "points": []}
     
     def mousePressEvent(self, event: QPaintEvent) -> None:
-        if self._drawing_point_enabled:
-            self.addPoint(event.pos())
-        elif self._drawing_line_enabled:
-            self.temp_points.append(event.pos())
-            if len(self.temp_points) == 2:
-                self.addLine(QLine(self.temp_points[0], self.temp_points[1]))
-                self.temp_points = []
+        if event.button() == Qt.LeftButton:
+            if self._drawing_point_enabled:
+                self.addPoint(event.pos())
+            elif self._drawing_line_enabled:
+                self.temp_line = QLine(event.pos(), event.pos())
+    
+    def mouseMoveEvent(self, event):
+        if self._drawing_line_enabled:
+            self.temp_line.setP2(event.pos())
+            self.update()
+    
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton and self._drawing_line_enabled:
+            self.addLine(self.temp_line)
+            self.temp_line = None
     
     def keyPressEvent(self, event: QPaintEvent):
         # print("pressed key")
