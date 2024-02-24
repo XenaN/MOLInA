@@ -132,18 +132,22 @@ class DrawingAction:
 
 
 class DrawingWidget(QWidget):
+    coordinateUpdate = Signal(object)
     def __init__(self, parent=None):
         super().__init__(parent)
         self._lines = []
         self._points = []
         self.temp_line = None
+        self._atom_type = None
+        self._bond_type = None
         self._zoom_factor = 1.0
         self._drawing_line_enabled = False
         self._drawing_point_enabled = False
         self.action_manager = DrawingAction(self)
         self.setFocusPolicy(Qt.StrongFocus)
-        self._original_coordinate = {"lines": [],
-                                     "points": []}        
+        self._original_coordinate = {"bonds": [],
+                                     "lines": [],
+                                     "atoms": []}        
 
     def paintEvent(self, event: QPaintEvent) -> None:
         painter = QPainter(self)
@@ -158,49 +162,86 @@ class DrawingWidget(QWidget):
 
         if self.temp_line:
             painter.drawLine(self.temp_line)
-
+        
         # painter.setBrush(QColor(150, 150, 100, 100))
         # painter.drawRect(self.rect())
 
+    def findAtoms(self, line: QLine, threshold: int = 20) -> Dict:
+        close_point = {}
+        for i, atom in enumerate(self._original_coordinate["atoms"]):
+            point = QPoint(atom["x"], atom["y"])
+            distance_to_start = (line.p1() - point).manhattanLength()
+            distance_to_end = (line.p2() - point).manhattanLength()
+            if distance_to_start <= threshold:
+                close_point[i] = line.p1()
+            elif distance_to_end <= threshold:
+                close_point[i] = line.p2()
+        
+        if len(close_point) ==2: 
+            return close_point
+        else:
+            return
+
     def addLine(self, line: QLine, flag_undo: bool = True) -> None:
-        self._original_coordinate["lines"].append(QLine(
-            line.x1() / self._zoom_factor, 
-            line.y1() / self._zoom_factor,
-            line.x2() / self._zoom_factor,
-            line.y2() / self._zoom_factor))
-        self._lines.append(line)
-        if flag_undo:
-            self.action_manager.addAction(line, "add_line")
+        not_scaled_line = QLine(line.x1() / self._zoom_factor, 
+                                line.y1() / self._zoom_factor,
+                                line.x2() / self._zoom_factor,
+                                line.y2() / self._zoom_factor)
+        
+        atoms = self.findAtoms(not_scaled_line)
+        if atoms:
+            self._lines.append(line)
+            if flag_undo:
+                self.action_manager.addAction(line, "add_line")
+            
+            self._original_coordinate["lines"].append(not_scaled_line)
+            self._original_coordinate["bonds"].append({"bond_type": self._bond_type,
+                                                       "endpoint_atoms": list(atoms.keys())})
+            
+            self.coordinateUpdate.emit(self._original_coordinate)
+        else: 
+            self.temp_line = None
 
         self.update()
     
     def deleteLine(self, flag_undo: bool = True) -> None:
+        self._original_coordinate["bonds"].pop()
         self._original_coordinate["lines"].pop()
         last_line = self._lines.pop()
         if flag_undo:
             self.action_manager.addAction(last_line, "delete_line")
+
+        self.coordinateUpdate.emit(self._original_coordinate)
         self.update()
 
     def addPoint(self, point: QPoint, flag_undo: bool = True) -> None:
-        self._original_coordinate["points"].append(QPoint(
-            point.x() / self._zoom_factor, point.y() / self._zoom_factor))
+        self._original_coordinate["atoms"].append({
+            "atom_symbol": self._atom_type,
+            "x": point.x() / self._zoom_factor, 
+            "y": point.y() / self._zoom_factor})
         if flag_undo:
             self.action_manager.addAction(point, "add_point")
         self._points.append(point)
+
+        self.coordinateUpdate.emit(self._original_coordinate)
         self.update()
     
     def deletePoint(self, flag_undo: bool = True) -> None:
-        self._original_coordinate["points"].pop()
+        self._original_coordinate["atoms"].pop()
         last_point = self._points.pop()
         if flag_undo:
             self.action_manager.addAction(last_point, "delete_point")
+        
+        self.coordinateUpdate.emit(self._original_coordinate)
         self.update()
 
-    def setDrawingMode(self, enabled: bool, type: str) -> None:
+    def setDrawingMode(self, enabled: bool, type: str, info: str) -> None:
         if type == "point":
             self._drawing_point_enabled = enabled
+            self._atom_type = info
         elif type == "line":
             self._drawing_line_enabled = enabled
+            self._bond_type = info
         else:
             raise TypeError()
     
@@ -214,10 +255,10 @@ class DrawingWidget(QWidget):
                 line.p2().x() * self._zoom_factor,
                 line.p2().y() * self._zoom_factor))
             
-        for i in range(len(self._original_coordinate["points"])):
-            point = self._original_coordinate["points"][i]
-            self._points[i].setX(point.x() * self._zoom_factor)
-            self._points[i].setY(point.y() * self._zoom_factor)
+        for i in range(len(self._original_coordinate["atoms"])):
+            point = self._original_coordinate["atoms"][i]
+            self._points[i].setX(point["x"] * self._zoom_factor)
+            self._points[i].setY(point["y"] * self._zoom_factor)
     
     def setZoomFactor(self, factor: float) -> None:
         self._zoom_factor = factor
@@ -226,7 +267,7 @@ class DrawingWidget(QWidget):
     def getOriginalCoordinate(self) -> Dict:
         return self._original_coordinate
     
-    def cleanDrawingWidget(self):
+    def cleanDrawingWidget(self) -> None:
         self._lines = []
         self._points = []
         self.temp_line = None
@@ -234,8 +275,9 @@ class DrawingWidget(QWidget):
         self._drawing_line_enabled = False
         self._drawing_point_enabled = False
         self.action_manager = DrawingAction(self)
-        self._original_coordinate = {"lines": [],
-                                     "points": []}
+        self._original_coordinate = {"bonds": [],
+                                     "lines": [],
+                                     "atoms": []}
     
     def mousePressEvent(self, event: QPaintEvent) -> None:
         if event.button() == Qt.LeftButton:
@@ -244,29 +286,31 @@ class DrawingWidget(QWidget):
             elif self._drawing_line_enabled:
                 self.temp_line = QLine(event.pos(), event.pos())
     
-    def mouseMoveEvent(self, event):
+    def mouseMoveEvent(self, event) -> None:
         if self._drawing_line_enabled:
             self.temp_line.setP2(event.pos())
             self.update()
     
-    def mouseReleaseEvent(self, event):
+    def mouseReleaseEvent(self, event) -> None:
         if event.button() == Qt.LeftButton and self._drawing_line_enabled:
             self.addLine(self.temp_line)
             self.temp_line = None
+
+    def updatePoints(self, coordinates) -> None:
+        # Update points from Dataset
+        # self.update()
+        pass
     
-    def keyPressEvent(self, event: QPaintEvent):
-        # print("pressed key")
+    def keyPressEvent(self, event: QPaintEvent) -> None:
         super().keyPressEvent(event)
         if event.key() == Qt.Key_Z and event.modifiers() == Qt.ControlModifier:
             self.action_manager.undo()
 
-        elif event.key() == Qt.Key_F:
-            # print("pressed F")
-            self.setDrawingMode(not self._drawing_point_enabled, "point")
+        elif event.key() == Qt.Key_C:
+            self.setDrawingMode(not self._drawing_point_enabled, "point", "C")
         
         elif event.key() == Qt.Key_1:
-            # print("pressed 1")
-            self.setDrawingMode(not self._drawing_line_enabled, "line")
+            self.setDrawingMode(not self._drawing_line_enabled, "line", "single")
 
 
 class CentralWidget(QWidget):
@@ -303,15 +347,15 @@ class CentralWidget(QWidget):
         self.image_widget.setAlignment(Qt.AlignCenter)
         self.image_widget.setMinimumSize(200, 200)
 
-        self.containerWidget = QWidget()
-        self.containerLayout = QHBoxLayout(self.containerWidget)
-        self.containerLayout.setContentsMargins(0, 0, 0, 0)      
+        self.container_widget = QWidget()
+        self.container_layout = QHBoxLayout(self.container_widget)
+        self.container_layout.setContentsMargins(0, 0, 0, 0)      
         
         self.drawing_widget = DrawingWidget()
         self.drawing_widget.setFocus()
-        self.containerLayout.addWidget(self.drawing_widget, alignment=Qt.AlignCenter)
+        self.container_layout.addWidget(self.drawing_widget, alignment=Qt.AlignCenter)
 
-        self.image_layout.addWidget(self.containerWidget)
+        self.image_layout.addWidget(self.container_widget)
         self.image_layout.addWidget(self.image_widget)
         # self.setColor(self.drawing_widget, QColor(100, 250, 150, 100))
         self.setColor(self.image_widget, COLOR_BACKGROUND_WIDGETS)
@@ -353,26 +397,30 @@ class CentralWidget(QWidget):
                 self._scale_factor * self._pixmap.size(),
                 Qt.KeepAspectRatio))
         
-    def fitImage(self) -> None:
+    def fitImage(self) -> QPixmap:
         if self._pixmap.height() >= self._pixmap.width():
-            self._pixmap = self._pixmap.scaledToHeight(self.image_widget.height())
+            scaled_pixmap = self._pixmap.scaledToHeight(self.image_widget.height())
             # if picture is still out of boundaries
-            if self._pixmap.width() >= self.image_widget.width():
-                self._pixmap = self._pixmap.scaledToWidth(self.image_widget.width())
+            if scaled_pixmap.width() >= self.image_widget.width():
+                scaled_pixmap = scaled_pixmap.scaledToWidth(self.image_widget.width())
         else:
-            self._pixmap = self._pixmap.scaledToWidth(self.image_widget.width())
+            scaled_pixmap = self._pixmap.scaledToWidth(self.image_widget.width())
             # if picture is still out of boundaries
-            if self._pixmap.height() >= self.image_widget.height():
-                self._pixmap = self._pixmap.scaledToHeight(self.image_widget.height())
+            if scaled_pixmap.height() >= self.image_widget.height():
+                scaled_pixmap = scaled_pixmap.scaledToHeight(self.image_widget.height())
         
-        self.image_widget.setPixmap(self._pixmap)
+        self.image_widget.setPixmap(scaled_pixmap)
+        return scaled_pixmap
     
     def setCentralPixmap(self, image: QPixmap) -> None:
         self._pixmap = image
         if not self._pixmap.isNull():
-            self.fitImage()
-            self.drawing_widget.setFixedSize(self._pixmap.size())
+            original_size = self._pixmap.height() + self._pixmap.width()
+            scaled_pixmap = self.fitImage()
+
+            self.drawing_widget.setFixedSize(scaled_pixmap.size())
             self.drawing_widget.cleanDrawingWidget()
+            self.setScaleFactor((scaled_pixmap.height() + scaled_pixmap.width()) / original_size)
 
     def setColor(self, widget: QWidget, color: QColor) -> None:
         widget.setAutoFillBackground(True)
@@ -380,13 +428,13 @@ class CentralWidget(QWidget):
         palette.setColor(QPalette.Window, color)
         widget.setPalette(palette)
 
-    def runLoadAnimation(self):
-        #set disabled buttons
+    def runLoadAnimation(self) -> None:
+        #set disabled file manager and drawing
         # show animation and run
         pass
 
-    def stopLoadAnimation(self):
-        # set enabled buttons
+    def stopLoadAnimation(self) -> None:
+        # set enabled file manager and drawing
         # stop animation
         pass
     
@@ -412,6 +460,8 @@ class MainWindow(QMainWindow):
 
         self.data_images.current_image_signal.current_image.connect(self.changeImage)
         self.data_images.current_image_signal.current_annotation.connect(self.changeAnnotation)
+        # self.data_images.current_image_signal.data_changed.connect(
+        #     self.central_widget.drawing_widget.updateCoordinates)
 
         self.page_layout = QHBoxLayout()
         self.splitter =  QSplitter(self)
@@ -419,6 +469,7 @@ class MainWindow(QMainWindow):
         
         self.central_widget = CentralWidget()
         self.setColor(self.central_widget, COLOR_BACKGROUND_WIDGETS)
+        self.central_widget.drawing_widget.coordinateUpdate.connect(self.addPointToDataset)
         # self.data_images.current_image_signal.model_completed.connect(self.central_widget.stopLoadAnimation)
 
         self.file_widget = FileManager(self)
@@ -512,7 +563,7 @@ class MainWindow(QMainWindow):
             selected_file = file_dialog.selectedFiles()[0]
             self.imagePathSelected.emit(selected_file)
     
-    def changeAnnotation(self, annotation: Dict[str, List[Any]]):
+    def changeAnnotation(self, annotation: Dict[str, List[Any]]) -> None:
         annotation_json = json.dumps(annotation, indent=4, sort_keys=False)
         self.text_widget.setText(annotation_json)
 
@@ -525,7 +576,10 @@ class MainWindow(QMainWindow):
     
     def resizeEvent(self, event: QPaintEvent) -> None:
         self.central_widget.setPixmapSize()   
-    
+
+    def addPointToDataset(self, coordinate: Dict) -> None:
+        self.data_images.addCoordinates(coordinate)
+
     def setColor(self, widget: QWidget, color: QColor) -> None:
         widget.setAutoFillBackground(True)
         palette = widget.palette()

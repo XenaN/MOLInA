@@ -55,6 +55,7 @@ class ImageData():
 class ImageSignals(QObject):
     current_image = Signal(object)
     current_annotation = Signal(object)
+    data_changed = Signal(list)
 
 @dataclass
 class Dataset():
@@ -85,7 +86,13 @@ class Dataset():
     def run_molscribe_predict(self):
         self.images[self.current_image].run_molscribe()
         return self.images[self.current_image]
-
+    
+    def addCoordinates(self, coordinate: Dict):
+        self.images[self.current_image].atoms = coordinate["atoms"]
+        self.images[self.current_image].bonds = coordinate["bonds"]
+        self.current_image_signal.current_annotation.emit({"atoms:": self.images[self.current_image].atoms,
+                                                          "bonds": self.images[self.current_image].bonds})
+        
     def change_current_image(self, path: str) -> None:
         '''Changes current image'''
         if path not in self.images:
