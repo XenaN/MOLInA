@@ -55,7 +55,7 @@ class ImageData():
 class ImageSignals(QObject):
     current_image = Signal(object)
     current_annotation = Signal(object)
-    data_changed = Signal(list)
+    data_changed = Signal(object)
 
 @dataclass
 class Dataset():
@@ -87,14 +87,28 @@ class Dataset():
         self.images[self.current_image].run_molscribe()
         return self.images[self.current_image]
     
-    def addCoordinates(self, coordinate: Dict):
+    def add_coordinates(self, coordinate: Dict) -> None:
+        for atom in coordinate["atoms"]:
+            atom['x'] /= self.images[self.current_image].image.shape[1]
+            atom['y'] /= self.images[self.current_image].image.shape[0]
+
         self.images[self.current_image].atoms = coordinate["atoms"]
         self.images[self.current_image].bonds = coordinate["bonds"]
         self.current_image_signal.current_annotation.emit({"atoms:": self.images[self.current_image].atoms,
                                                           "bonds": self.images[self.current_image].bonds})
+    
+    def draw_annotation(self) -> None:
+        atoms = self.images[self.current_image].atoms.copy()
+        for atom in atoms:
+            atom['x'] *= self.images[self.current_image].image.shape[1]
+            atom['y'] *= self.images[self.current_image].image.shape[0]
+        
+        self.current_image_signal.data_changed.emit({"atoms": atoms,
+                                                     "bonds": self.images[self.current_image].bonds})
         
     def change_current_image(self, path: str) -> None:
         '''Changes current image'''
+        self.current_image = path
         if path not in self.images:
             image = self.open_image(path)
             annotation_path = Path.joinpath(Path(path).parent.resolve(),
@@ -113,12 +127,13 @@ class Dataset():
             if len(self.images) > 10:
                 oldest_key = list(self.images.keys())[0]
                 self.images.pop(oldest_key)
-        
-        self.current_image = path
 
         self.current_image_signal.current_image.emit(self.images[path].image)
         self.current_image_signal.current_annotation.emit({"atoms:": self.images[path].atoms,
                                                           "bonds": self.images[path].bonds})
+        
+        if len(self.images[path].atoms) != 0:
+            self.draw_annotation()
         
         
 class Worker(QObject):

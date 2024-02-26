@@ -246,6 +246,8 @@ class DrawingWidget(QWidget):
             raise TypeError()
     
     def updateDrawScale(self) -> None:
+        if len(self._lines) == 0:
+            self._lines = self._original_coordinate["lines"].copy()
         for i in range(len(self._original_coordinate["lines"])):
             line = self._original_coordinate["lines"][i]
             self._lines[i].setP1(QPoint(
@@ -255,6 +257,8 @@ class DrawingWidget(QWidget):
                 line.p2().x() * self._zoom_factor,
                 line.p2().y() * self._zoom_factor))
             
+        if len(self._points) == 0:
+            self._points = [QPoint() for i in range(len(self._original_coordinate["atoms"]))]
         for i in range(len(self._original_coordinate["atoms"])):
             point = self._original_coordinate["atoms"][i]
             self._points[i].setX(point["x"] * self._zoom_factor)
@@ -296,10 +300,22 @@ class DrawingWidget(QWidget):
             self.addLine(self.temp_line)
             self.temp_line = None
 
-    def updatePoints(self, coordinates) -> None:
-        # Update points from Dataset
-        # self.update()
-        pass
+    def updateCoordinates(self, coordinates) -> None:
+        self._original_coordinate = coordinates
+        self._original_coordinate["lines"] = []
+        atoms = self._original_coordinate["atoms"]
+        for bond in self._original_coordinate["bonds"]:
+            self._original_coordinate["lines"].append(
+                QLine(
+                    QPoint(atoms[bond["endpoint_atoms"][0]]["x"],
+                           atoms[bond["endpoint_atoms"][0]]["y"]),
+                    QPoint(atoms[bond["endpoint_atoms"][1]]["x"],
+                           atoms[bond["endpoint_atoms"][1]]["y"])
+                    )
+            )
+
+        self.updateDrawScale()
+        self.update()
     
     def keyPressEvent(self, event: QPaintEvent) -> None:
         super().keyPressEvent(event)
@@ -460,8 +476,6 @@ class MainWindow(QMainWindow):
 
         self.data_images.current_image_signal.current_image.connect(self.changeImage)
         self.data_images.current_image_signal.current_annotation.connect(self.changeAnnotation)
-        # self.data_images.current_image_signal.data_changed.connect(
-        #     self.central_widget.drawing_widget.updateCoordinates)
 
         self.page_layout = QHBoxLayout()
         self.splitter =  QSplitter(self)
@@ -471,6 +485,8 @@ class MainWindow(QMainWindow):
         self.setColor(self.central_widget, COLOR_BACKGROUND_WIDGETS)
         self.central_widget.drawing_widget.coordinateUpdate.connect(self.addPointToDataset)
         # self.data_images.current_image_signal.model_completed.connect(self.central_widget.stopLoadAnimation)
+        self.data_images.current_image_signal.data_changed.connect(
+            self.central_widget.drawing_widget.updateCoordinates)
 
         self.file_widget = FileManager(self)
         self.file_widget.itemSelected.connect(self.data_images.change_current_image)
@@ -578,7 +594,7 @@ class MainWindow(QMainWindow):
         self.central_widget.setPixmapSize()   
 
     def addPointToDataset(self, coordinate: Dict) -> None:
-        self.data_images.addCoordinates(coordinate)
+        self.data_images.add_coordinates(coordinate)
 
     def setColor(self, widget: QWidget, color: QColor) -> None:
         widget.setAutoFillBackground(True)
