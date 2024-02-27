@@ -35,6 +35,7 @@ from PySide6.QtWidgets import (
     QTreeView,
     QAbstractItemView,
     QScrollArea,
+    QMenu,
 )
 from PySide6.QtGui import (
     QPalette, 
@@ -94,6 +95,20 @@ class FileManager(QWidget):
         if QFile(path).exists() and not QFileInfo(path).isDir():
             if path.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.bmp')):
                 self.itemSelected.emit(path)
+
+
+class FileAction:
+    def __init__(self):
+        self.recent_images = []
+    
+    def addRecentImage(self, image_path):
+        if image_path in self.recent_images:
+            self.recent_images.remove(image_path)
+
+        self.recent_images.insert(0, image_path)
+
+    def getRecentImages(self):
+        return self.recent_images
 
 
 class DrawingAction:
@@ -473,6 +488,7 @@ class MainWindow(QMainWindow):
         self.page_layout = QHBoxLayout()
         self.splitter =  QSplitter(self)
         self.toolbar_main = QToolBar()
+        self.fileAction = FileAction()
         
         self.central_widget = CentralWidget()
         self.setColor(self.central_widget, COLOR_BACKGROUND_WIDGETS)
@@ -482,7 +498,7 @@ class MainWindow(QMainWindow):
             self.central_widget.drawing_widget.updateCoordinates)
 
         self.file_widget = FileManager(self)
-        self.file_widget.itemSelected.connect(self.data_images.change_current_image)
+        self.file_widget.itemSelected.connect(self.changeCurrentImage)
 
         self.splitter.addWidget(self.file_widget)
 
@@ -519,17 +535,23 @@ class MainWindow(QMainWindow):
         self.button_right.setIcon(QIcon(RESOURCES_PATH.filePath("right_button.png")))
         self.toolbar_main.addWidget(self.button_right)
 
+        self.recent_menu = QMenu()
+        self.button_recent = QToolButton()
+        self.button_recent.setIcon(QIcon(RESOURCES_PATH.filePath("recent.png")))
+        self.button_recent.setMenu(self.recent_menu)
+        self.button_recent.pressed.connect(self.showRecent)
+        
+        self.toolbar_main.addWidget(self.button_recent)
+
         self.toolbar_main.setIconSize(QSize(19, 19))
 
         self.button_annotate = QPushButton("Annotate")
         self.toolbar_main.addWidget(self.button_annotate)
 
         self.button_current_model = QPushButton("Current Model")
-        # self.button_current_model.pressed.connect(self.data_images.run_molscribe)
         self.toolbar_main.addWidget(self.button_current_model)
 
         self.button_predict = QPushButton("Predict")
-        # self.button_predict.pressed.connect(self.data_images.run_molscribe_predict)
         self.button_predict.pressed.connect(self.startPrediction)
         self.button_predict.pressed.connect(self.central_widget.runLoadAnimation)
         self.toolbar_main.addWidget(self.button_predict)
@@ -570,7 +592,13 @@ class MainWindow(QMainWindow):
 
         if file_dialog.exec_():
             selected_file = file_dialog.selectedFiles()[0]
-            self.imagePathSelected.emit(selected_file)
+            self.changeCurrentImage(selected_file)
+
+            self.fileAction.addRecentImage(selected_file)
+        
+    def changeCurrentImage(self, path: str) -> None:
+        self.fileAction.addRecentImage(path)
+        self.imagePathSelected.emit(path)
     
     def changeAnnotation(self, annotation: Dict[str, List[Any]]) -> None:
         annotation_json = json.dumps(annotation, indent=4, sort_keys=False)
@@ -590,13 +618,13 @@ class MainWindow(QMainWindow):
         self.worker.result.connect(self.onModelCompleted)
 
         self.thread.start()
-        
 
     def onModelCompleted(self, model_result: Dict) -> None:
         if model_result:
             model_result_json = json.dumps(model_result, indent=4, sort_keys=True)
             self.text_widget.setText(model_result_json)
             self.data_images.draw_annotation()
+        
         self.file_widget.setEnabled(True)
         self.toolbar_main.setEnabled(True)
     
@@ -612,3 +640,12 @@ class MainWindow(QMainWindow):
         palette.setColor(QPalette.Window, color)
         widget.setPalette(palette)
     
+    def showRecent(self) -> None:
+        self.recent_menu.clear()
+        for file_path in self.fileAction.getRecentImages():
+            action = self.recent_menu.addAction(file_path)
+            action.triggered[bool].connect(lambda checked, path=file_path: self.changeCurrentImage(path))
+        
+        menu_pos = self.button_recent.parentWidget().mapToGlobal(self.button_recent.geometry().bottomLeft())
+        self.recent_menu.popup(menu_pos)
+        
