@@ -219,6 +219,7 @@ class DrawingWidget(QWidget):
             "atom_symbol": self._atom_type,
             "x": point.x() / self._zoom_factor, 
             "y": point.y() / self._zoom_factor})
+        
         if flag_undo:
             self.action_manager.addAction(point, "add_point")
         self._points.append(point)
@@ -303,6 +304,8 @@ class DrawingWidget(QWidget):
     def updateCoordinates(self, coordinates) -> None:
         self._original_coordinate = coordinates
         self._original_coordinate["lines"] = []
+        self._lines = []
+        self._points = []
         atoms = self._original_coordinate["atoms"]
         for bond in self._original_coordinate["bonds"]:
             self._original_coordinate["lines"].append(
@@ -464,16 +467,6 @@ class MainWindow(QMainWindow):
 
         self.data_images = Dataset(images = {})
 
-        self.thread = QThread()
-        self.worker = Worker(self.data_images)
-        self.worker.moveToThread(self.thread)
-        
-        self.thread.started.connect(self.worker.run)
-        self.worker.finished.connect(self.thread.quit)
-        self.worker.finished.connect(self.worker.deleteLater)
-        self.thread.finished.connect(self.thread.deleteLater)
-        self.worker.result.connect(self.onModelCompleted)
-
         self.data_images.current_image_signal.current_image.connect(self.changeImage)
         self.data_images.current_image_signal.current_annotation.connect(self.changeAnnotation)
 
@@ -537,7 +530,7 @@ class MainWindow(QMainWindow):
 
         self.button_predict = QPushButton("Predict")
         # self.button_predict.pressed.connect(self.data_images.run_molscribe_predict)
-        self.button_predict.pressed.connect(self.thread.start)
+        self.button_predict.pressed.connect(self.startPrediction)
         self.button_predict.pressed.connect(self.central_widget.runLoadAnimation)
         self.toolbar_main.addWidget(self.button_predict)
 
@@ -583,12 +576,25 @@ class MainWindow(QMainWindow):
         annotation_json = json.dumps(annotation, indent=4, sort_keys=False)
         self.text_widget.setText(annotation_json)
 
+    def startPrediction(self) -> None:
+        self.thread = QThread()
+        self.worker = Worker(self.data_images)
+        self.worker.moveToThread(self.thread)
+
+        self.thread.started.connect(self.worker.run)
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.worker.result.connect(self.onModelCompleted)
+
+        self.thread.start()
+
     def onModelCompleted(self, model_result: Dict) -> None:
         if model_result:
             model_result_json = json.dumps(model_result, indent=4, sort_keys=True)
             self.text_widget.setText(model_result_json)
-        self.thread.quit()
-        self.thread.wait()
+            self.data_images.draw_annotation()
+        
     
     def resizeEvent(self, event: QPaintEvent) -> None:
         self.central_widget.setPixmapSize()   

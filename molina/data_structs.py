@@ -1,7 +1,7 @@
 '''MolScribe functionality'''
 
 #%% Imports
-import json
+import json, copy
 from pathlib import Path
 
 import torch, cv2
@@ -29,9 +29,9 @@ class ImageData():
     '''Path to the annotation file'''
     image: np.array
     '''Numpy-array representation of the image'''
-    atoms: Optional[List[dict[str, float]]]  = field(default_factory=list) # define type more precisely (list of tuples of 2 floats and strs? or better specifical data structure)
+    atoms: Optional[List[Dict[str, float]]]  = field(default_factory=list) # define type more precisely (list of tuples of 2 floats and strs? or better specifical data structure)
     '''List of recognized atoms and their parameters'''
-    bonds: Optional[List[dict[str, Any]]]  = field(default_factory=list)# define type more precisely (list of tuples of 2 ints and str? or better specifical data structure)
+    bonds: Optional[List[Dict[str, Any]]]  = field(default_factory=list)# define type more precisely (list of tuples of 2 ints and str? or better specifical data structure)
     '''List of recognized bonds and their parameters'''
     
     def run_molscribe(self) -> None:
@@ -84,25 +84,28 @@ class Dataset():
             return
     
     def run_molscribe_predict(self):
+        self.images[self.current_image].atoms = []
+        self.images[self.current_image].bonds = []
         self.images[self.current_image].run_molscribe()
+
         return self.images[self.current_image]
     
-    def add_coordinates(self, coordinate: Dict) -> None:
-        for atom in coordinate["atoms"]:
+    def add_coordinates(self, coordinates: Dict) -> None:
+        new_annotation = copy.deepcopy(coordinates)
+        for atom in new_annotation["atoms"]:
             atom['x'] /= self.images[self.current_image].image.shape[1]
             atom['y'] /= self.images[self.current_image].image.shape[0]
 
-        self.images[self.current_image].atoms = coordinate["atoms"]
-        self.images[self.current_image].bonds = coordinate["bonds"]
+        self.images[self.current_image].atoms = new_annotation["atoms"]
+        self.images[self.current_image].bonds = new_annotation["bonds"]
         self.current_image_signal.current_annotation.emit({"atoms:": self.images[self.current_image].atoms,
                                                           "bonds": self.images[self.current_image].bonds})
     
     def draw_annotation(self) -> None:
-        atoms = self.images[self.current_image].atoms.copy()
+        atoms = copy.deepcopy(self.images[self.current_image].atoms)
         for atom in atoms:
             atom['x'] *= self.images[self.current_image].image.shape[1]
             atom['y'] *= self.images[self.current_image].image.shape[0]
-        
         self.current_image_signal.data_changed.emit({"atoms": atoms,
                                                      "bonds": self.images[self.current_image].bonds})
         
@@ -131,7 +134,7 @@ class Dataset():
         self.current_image_signal.current_image.emit(self.images[path].image)
         self.current_image_signal.current_annotation.emit({"atoms:": self.images[path].atoms,
                                                           "bonds": self.images[path].bonds})
-        
+
         if len(self.images[path].atoms) != 0:
             self.draw_annotation()
         
@@ -151,6 +154,7 @@ class Worker(QObject):
             {"atoms:": result.atoms, 
              "bonds": result.bonds})
         self.finished.emit()
+
 
 
 # HINT: next two functions possibly require additional code decomposition
