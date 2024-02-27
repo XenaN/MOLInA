@@ -577,6 +577,8 @@ class MainWindow(QMainWindow):
         self.text_widget.setText(annotation_json)
 
     def startPrediction(self) -> None:
+        self.file_widget.setEnabled(False)
+        self.toolbar_main.setEnabled(False)
         self.thread = QThread()
         self.worker = Worker(self.data_images)
         self.worker.moveToThread(self.thread)
@@ -588,13 +590,15 @@ class MainWindow(QMainWindow):
         self.worker.result.connect(self.onModelCompleted)
 
         self.thread.start()
+        
 
     def onModelCompleted(self, model_result: Dict) -> None:
         if model_result:
             model_result_json = json.dumps(model_result, indent=4, sort_keys=True)
             self.text_widget.setText(model_result_json)
             self.data_images.draw_annotation()
-        
+        self.file_widget.setEnabled(True)
+        self.toolbar_main.setEnabled(True)
     
     def resizeEvent(self, event: QPaintEvent) -> None:
         self.central_widget.setPixmapSize()   
