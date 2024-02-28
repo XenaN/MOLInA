@@ -46,6 +46,7 @@ from PySide6.QtGui import (
     QPainter, 
     QPen,
     QPaintEvent,
+    QAction,
 )
 
 from molina.data_structs import Dataset, Worker
@@ -531,19 +532,21 @@ class MainWindow(QMainWindow):
         self.button_recent.setIcon(QIcon(RESOURCES_PATH.filePath("recent.png")))
         self.button_recent.setMenu(self.recent_menu)
         self.button_recent.pressed.connect(self.showRecent)
-        
         self.toolbar_main.addWidget(self.button_recent)
-
-        self.toolbar_main.setIconSize(QSize(19, 19))
 
         self.model_menu = QMenu()
         self.button_current_model = QPushButton("Current Model")
         self.button_current_model.setMenu(self.model_menu)
         self.toolbar_main.addWidget(self.button_current_model)
 
+        self.model_menu_items = ["MolScribe", "another"]
+        self.setModelMenu()
+
         self.button_predict = QPushButton("Predict")
         self.button_predict.pressed.connect(self.startPrediction)
         self.toolbar_main.addWidget(self.button_predict)
+        
+        self.toolbar_main.setIconSize(QSize(19, 19))
 
         self.imagePathSelected.connect(self.data_images.change_current_image)
           
@@ -637,4 +640,21 @@ class MainWindow(QMainWindow):
         
         menu_pos = self.button_recent.parentWidget().mapToGlobal(self.button_recent.geometry().bottomLeft())
         self.recent_menu.popup(menu_pos)
+    
+    def setModelMenu(self) -> None:
+        for item in self.model_menu_items:
+            action = QAction(item, self)
+            action.setCheckable(True)
+            action.triggered[bool].connect(lambda _, name=item: self.set_model(name))
+            self.model_menu.addAction(action)
+
+        self.model_menu.actions()[0].setChecked(True)
+    
+    def updateCheckedModel(self, selected_model_name: str) -> None:
+        for action in self.model_menu.actions():
+            action.setChecked(action.text() == selected_model_name)
+
+    def set_model(self, model_name: str) -> None:
+        self.data_images.set_current_model(model_name)
+        self.updateCheckedModel(model_name)
         

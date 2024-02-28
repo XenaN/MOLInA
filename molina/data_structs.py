@@ -67,15 +67,21 @@ class Dataset():
     '''Total number of images in dataset'''
     current_image: str = ''
     '''Index of the current image'''
+    current_model: str = "MolScribe"
+    '''Current model for prediction atoms and bonds'''
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.current_image_signal = ImageSignals()
+        self.model_map = {"MolScribe": self.run_molscribe_predict, "another": None}
+    
+    def set_current_model(self, model_name: str) -> None:
+        self.current_model = model_name
 
-    def open_image(self, path: str):
+    def open_image(self, path: str) -> npt.NDArray:
         image = cv2.imread(path, cv2.IMREAD_UNCHANGED) 
         return image
     
-    def check_annotation(self, annotation_path: str):
+    def check_annotation(self, annotation_path: str) -> Optional[Dict]:
         if annotation_path.is_file():
             with open(annotation_path) as f:
                 annotation = json.load(f)
@@ -83,7 +89,7 @@ class Dataset():
         else:
             return
     
-    def run_molscribe_predict(self):
+    def run_molscribe_predict(self) -> npt.NDArray:
         self.images[self.current_image].atoms = []
         self.images[self.current_image].bonds = []
         self.images[self.current_image].run_molscribe()
@@ -155,7 +161,7 @@ class Worker(QObject):
         self.data = data
 
     def run(self):
-        result = self.data.run_molscribe_predict()
+        result = self.data.model_map[self.data.current_model]()
 
         self.result.emit(
             {"atoms:": result.atoms, 
