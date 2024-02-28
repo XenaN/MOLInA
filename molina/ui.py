@@ -1,5 +1,5 @@
 ''''''
-import json, os
+import json, copy
 
 from typing import List, Dict, Any
 import numpy.typing as npt
@@ -36,6 +36,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QScrollArea,
     QMenu,
+    QMessageBox,
 )
 from PySide6.QtGui import (
     QPalette, 
@@ -263,7 +264,7 @@ class DrawingWidget(QWidget):
     
     def updateDrawScale(self) -> None:
         if len(self._lines) == 0:
-            self._lines = self._original_coordinate["lines"].copy()
+            self._lines = copy.deepcopy(self._original_coordinate["lines"])
         for i in range(len(self._original_coordinate["lines"])):
             line = self._original_coordinate["lines"][i]
             self._lines[i].setP1(QPoint(
@@ -414,6 +415,12 @@ class CentralWidget(QWidget):
 
         self.central_widget_layout.addWidget(self.scrollArea)
     
+    def hasPixmap(self) -> bool:
+        if self._pixmap.isNull():
+            return False
+        else:
+            return True
+
     def setScaleFactor(self, factor: float) -> None:
         self._scale_factor = factor
         self.drawing_widget.setZoomFactor(self._scale_factor)
@@ -612,6 +619,10 @@ class MainWindow(QMainWindow):
         self.text_widget.setText(annotation_json)
 
     def startPrediction(self) -> None:
+        if not self.central_widget.hasPixmap():
+            QMessageBox.warning(self, "Prediction Error", "No image to predict.")
+            return
+        
         self.file_widget.setEnabled(False)
         self.toolbar_main.setEnabled(False)
         self.thread = QThread()
