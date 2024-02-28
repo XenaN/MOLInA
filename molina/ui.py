@@ -132,19 +132,18 @@ class DrawingAction:
             if action_type == 'add_point':
                 # Undo add_point by removing the last point
                 self.widget.deletePoint(False)
-                self.widget.update()
             elif action_type == 'delete_point':
                 # Undo delete_point by re-adding the point
                 self.widget.addPoint(data, False)
-                self.widget.update()
             elif action_type == 'add_line':
                 # Undo add_line by removing the last line
                 self.widget.deleteLine(False)
-                self.widget.update()
             elif action_type == 'delete_line':
                 # Undo delete_line by re-adding the line
                 self.widget.addLine(data, False)
-                self.widget.update()
+            elif action_type == 'clear_all':
+                self.widget.updateCoordinates(data)
+                self.widget.coordinateUpdate.emit(data)
 
 
 class DrawingWidget(QWidget):
@@ -336,6 +335,18 @@ class DrawingWidget(QWidget):
         self.updateDrawScale()
         self.update()
     
+    def clearAll(self) -> None:
+        if len(self._original_coordinate["atoms"]) != 0: 
+            self.action_manager.addAction(self._original_coordinate, "clear_all")
+            self._lines = []
+            self._points = []
+            self.temp_line = None
+            self._original_coordinate = {"bonds": [],
+                                        "lines": [],
+                                        "atoms": []}
+            self.coordinateUpdate.emit(self._original_coordinate)
+            self.update()
+    
     def keyPressEvent(self, event: QPaintEvent) -> None:
         super().keyPressEvent(event)
         if event.key() == Qt.Key_Z and event.modifiers() == Qt.ControlModifier:
@@ -484,7 +495,6 @@ class MainWindow(QMainWindow):
         self.central_widget = CentralWidget()
         self.setColor(self.central_widget, COLOR_BACKGROUND_WIDGETS)
         self.central_widget.drawing_widget.coordinateUpdate.connect(self.addPointToDataset)
-        # self.data_images.current_image_signal.model_completed.connect(self.central_widget.stopLoadAnimation)
         self.data_images.current_image_signal.data_changed.connect(
             self.central_widget.drawing_widget.updateCoordinates)
 
@@ -533,6 +543,11 @@ class MainWindow(QMainWindow):
         self.button_recent.setMenu(self.recent_menu)
         self.button_recent.pressed.connect(self.showRecent)
         self.toolbar_main.addWidget(self.button_recent)
+
+        self.button_clean = QToolButton()
+        self.button_clean.setIcon(QIcon(RESOURCES_PATH.filePath("eraser.png")))
+        self.button_clean.pressed.connect(self.central_widget.drawing_widget.clearAll)
+        self.toolbar_main.addWidget(self.button_clean)
 
         self.model_menu = QMenu()
         self.button_current_model = QPushButton("Current Model")
