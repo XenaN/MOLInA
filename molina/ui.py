@@ -461,16 +461,6 @@ class CentralWidget(QWidget):
         palette = widget.palette()
         palette.setColor(QPalette.Window, color)
         widget.setPalette(palette)
-
-    def runLoadAnimation(self) -> None:
-        #set disabled file manager and drawing
-        # show animation and run
-        pass
-
-    def stopLoadAnimation(self) -> None:
-        # set enabled file manager and drawing
-        # stop animation
-        pass
     
 
 class MainWindow(QMainWindow):
@@ -524,6 +514,7 @@ class MainWindow(QMainWindow):
         self.toolbar_main.addWidget(self.button_open)
 
         self.button_save = QPushButton("Save")
+        self.button_save.pressed.connect(self.data_images.save_annotation)
         self.toolbar_main.addWidget(self.button_save)
 
         # TODO: when click on right mouse button give list of current cache 
@@ -545,15 +536,13 @@ class MainWindow(QMainWindow):
 
         self.toolbar_main.setIconSize(QSize(19, 19))
 
-        self.button_annotate = QPushButton("Annotate")
-        self.toolbar_main.addWidget(self.button_annotate)
-
+        self.model_menu = QMenu()
         self.button_current_model = QPushButton("Current Model")
+        self.button_current_model.setMenu(self.model_menu)
         self.toolbar_main.addWidget(self.button_current_model)
 
         self.button_predict = QPushButton("Predict")
         self.button_predict.pressed.connect(self.startPrediction)
-        self.button_predict.pressed.connect(self.central_widget.runLoadAnimation)
         self.toolbar_main.addWidget(self.button_predict)
 
         self.imagePathSelected.connect(self.data_images.change_current_image)

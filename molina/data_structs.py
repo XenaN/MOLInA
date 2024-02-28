@@ -109,6 +109,13 @@ class Dataset():
         self.current_image_signal.data_changed.emit({"atoms": atoms,
                                                      "bonds": self.images[self.current_image].bonds})
         
+    def save_annotation(self) -> None:
+        with open(self.images[self.current_image].path_annotation, 'w', encoding='utf-8') as f:
+            json.dump({
+                "atoms": self.images[self.current_image].atoms,
+                "bonds": self.images[self.current_image].bonds
+            }, f, ensure_ascii=False, indent=4)
+
     def change_current_image(self, path: str) -> None:
         '''Changes current image'''
         self.current_image = path
@@ -133,7 +140,7 @@ class Dataset():
 
         self.current_image_signal.current_image.emit(self.images[path].image)
         self.current_image_signal.current_annotation.emit({"atoms:": self.images[path].atoms,
-                                                          "bonds": self.images[path].bonds})
+                                                           "bonds": self.images[path].bonds})
 
         if len(self.images[path].atoms) != 0:
             self.draw_annotation()
@@ -175,3 +182,5 @@ def dataset_from_directory(path_dir) -> Dataset:
     # return
 
 
+
+# %%
