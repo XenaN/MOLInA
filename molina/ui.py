@@ -1,7 +1,7 @@
 ''''''
-import json, copy
+import json, copy, re
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 import numpy.typing as npt
 
 from PySide6.QtCore import (
@@ -183,6 +183,7 @@ class DrawingWidget(QWidget):
         # painter.drawRect(self.rect())
 
     def findAtoms(self, line: QLine, threshold: int = 20) -> Dict:
+        #TODO: threshold as % of size image
         close_point = {}
         for i, atom in enumerate(self._original_coordinate["atoms"]):
             point = QPoint(atom["x"], atom["y"])
@@ -193,7 +194,7 @@ class DrawingWidget(QWidget):
             elif distance_to_end <= threshold:
                 close_point[i] = line.p2()
         
-        if len(close_point) ==2: 
+        if len(close_point) == 2: 
             return close_point
         else:
             return
@@ -220,10 +221,16 @@ class DrawingWidget(QWidget):
 
         self.update()
     
-    def deleteLine(self, flag_undo: bool = True) -> None:
-        self._original_coordinate["bonds"].pop()
-        self._original_coordinate["lines"].pop()
-        last_line = self._lines.pop()
+    def deleteLine(self, index=None, flag_undo: bool = True) -> None:
+        if index:
+            self._original_coordinate["bonds"].pop(index)
+            self._original_coordinate["lines"].pop(index)
+            last_line = self._lines.pop(index)
+        else:
+            self._original_coordinate["bonds"].pop()
+            self._original_coordinate["lines"].pop()
+            last_line = self._lines.pop()
+        
         if flag_undo:
             self.action_manager.addAction(last_line, "delete_line")
 
@@ -243,21 +250,74 @@ class DrawingWidget(QWidget):
         self.coordinateUpdate.emit(self._original_coordinate)
         self.update()
     
-    def deletePoint(self, flag_undo: bool = True) -> None:
-        self._original_coordinate["atoms"].pop()
-        last_point = self._points.pop()
+    def deletePoint(self, index=None, flag_undo: bool = True) -> None:
+        if index:
+            self._original_coordinate["atoms"].pop(index)
+            last_point = self._points.pop(index)
+        else:
+            self._original_coordinate["atoms"].pop()
+            last_point = self._points.pop()
+        
         if flag_undo:
             self.action_manager.addAction(last_point, "delete_point")
         
         self.coordinateUpdate.emit(self._original_coordinate)
         self.update()
 
+    def recombineBonds(self, index: int) -> None:
+        i = len(self._original_coordinate["bonds"]) - 1
+        while i >= 0:
+            if index in self._original_coordinate["bonds"][i]["endpoint_atoms"]:
+                del self._original_coordinate["bonds"][i]
+                del self._original_coordinate["lines"][i]
+                del self._lines[i]
+            else:
+                self._original_coordinate["bonds"][i]["endpoint_atoms"] = [
+                    atom - 1 if atom > index else atom for atom in self._original_coordinate["bonds"][i]["endpoint_atoms"]]
+            i -= 1
+                
+    def lineCenter(self, line: QLine) -> QPoint:
+        x_center = (line.x1() + line.x2()) / 2
+        y_center = (line.y1() + line.y2()) / 2
+        return QPoint(x_center, y_center)
+    
+    def partLine(self, end_line: QPoint, center: QPoint, part: float = 0.66) -> QPoint:
+        x = center.x() + part * (end_line.x() - center.x())
+        y = center.y() + part * (end_line.y() - center.y())
+        return QPoint(x, y)
+
+    def isPointOnLineSegment(self, start: QPoint, end: QPoint, point: QPoint) -> bool:
+        line_length = (start - end).manhattanLength()
+        d1 = (point - start).manhattanLength()
+        d2 = (point - end).manhattanLength()
+
+        return abs(d1 + d2 - line_length) < 1e-5 
+
+    def findClosestObject(self, position, threshold: int = 20) -> None:
+        #TODO: threshold as % of size image
+        for i in range(len(self._points)):
+            distance = (position - self._points[i]).manhattanLength()
+            if distance <= threshold:
+                 self.recombineBonds(i)
+                 self.deletePoint(i)
+                 return
+        
+        for i in range(len(self._lines)):
+            center = self.lineCenter(self._lines[i])
+            part_P1 = self.partLine(self._lines[i].p1(), center)
+            part_P2 = self.partLine(self._lines[i].p2(), center)
+            if self.isPointOnLineSegment(part_P1, part_P2, position):
+                self.deleteLine(i)
+                return
+
     def setDrawingMode(self, enabled: bool, type: str, info: str) -> None:
         if type == "point":
             self._drawing_point_enabled = enabled
+            self._drawing_line_enabled = False
             self._atom_type = info
         elif type == "line":
             self._drawing_line_enabled = enabled
+            self._drawing_point_enabled = False
             self._bond_type = info
         else:
             raise TypeError()
@@ -299,13 +359,15 @@ class DrawingWidget(QWidget):
         self._original_coordinate = {"bonds": [],
                                      "lines": [],
                                      "atoms": []}
-    
+
     def mousePressEvent(self, event: QPaintEvent) -> None:
         if event.button() == Qt.LeftButton:
             if self._drawing_point_enabled:
                 self.addPoint(event.pos())
             elif self._drawing_line_enabled:
                 self.temp_line = QLine(event.pos(), event.pos())
+        elif event.button() == Qt.RightButton:
+            self.findClosestObject(event.pos())
     
     def mouseMoveEvent(self, event) -> None:
         if self._drawing_line_enabled:
@@ -615,8 +677,19 @@ class MainWindow(QMainWindow):
         self.imagePathSelected.emit(path)
     
     def changeAnnotation(self, annotation: Dict[str, List[Any]]) -> None:
-        annotation_json = json.dumps(annotation, indent=4, sort_keys=False)
-        self.text_widget.setText(annotation_json)
+        # annotation_json = json.dumps(annotation, indent=4, sort_keys=False)
+        annotation_pretty = ''
+        tab = '        '
+        for key in annotation.keys():
+            annotation_pretty = annotation_pretty + str(key) + ':\n' 
+            for i, item in enumerate(annotation[key]):
+                if key == "atoms":
+                    annotation_pretty = annotation_pretty + tab + "atom_number: " + str(i) + '\n'
+                for internal_key, internal_value in item.items(): 
+                    annotation_pretty = annotation_pretty + tab + str(internal_key) + ': ' + str(internal_value) + '\n'
+                annotation_pretty += '\n'
+
+        self.text_widget.setText(annotation_pretty)
 
     def startPrediction(self) -> None:
         if not self.central_widget.hasPixmap():

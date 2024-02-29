@@ -104,7 +104,7 @@ class Dataset():
 
         self.images[self.current_image].atoms = new_annotation["atoms"]
         self.images[self.current_image].bonds = new_annotation["bonds"]
-        self.current_image_signal.current_annotation.emit({"atoms:": self.images[self.current_image].atoms,
+        self.current_image_signal.current_annotation.emit({"atoms": self.images[self.current_image].atoms,
                                                           "bonds": self.images[self.current_image].bonds})
     
     def draw_annotation(self) -> None:
@@ -145,7 +145,7 @@ class Dataset():
                 self.images.pop(oldest_key)
 
         self.current_image_signal.current_image.emit(self.images[path].image)
-        self.current_image_signal.current_annotation.emit({"atoms:": self.images[path].atoms,
+        self.current_image_signal.current_annotation.emit({"atoms": self.images[path].atoms,
                                                            "bonds": self.images[path].bonds})
 
         if len(self.images[path].atoms) != 0:
@@ -164,7 +164,7 @@ class Worker(QObject):
         result = self.data.model_map[self.data.current_model]()
 
         self.result.emit(
-            {"atoms:": result.atoms, 
+            {"atoms": result.atoms, 
              "bonds": result.bonds})
         self.finished.emit()
 
