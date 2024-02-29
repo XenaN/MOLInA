@@ -221,8 +221,8 @@ class DrawingWidget(QWidget):
 
         self.update()
     
-    def deleteLine(self, index=None, flag_undo: bool = True) -> None:
-        if index:
+    def deleteLine(self, index=-1, flag_undo: bool = True) -> None:
+        if index != -1:
             self._original_coordinate["bonds"].pop(index)
             self._original_coordinate["lines"].pop(index)
             last_line = self._lines.pop(index)
@@ -250,8 +250,8 @@ class DrawingWidget(QWidget):
         self.coordinateUpdate.emit(self._original_coordinate)
         self.update()
     
-    def deletePoint(self, index=None, flag_undo: bool = True) -> None:
-        if index:
+    def deletePoint(self, index=-1, flag_undo: bool = True) -> None:
+        if index != -1:
             self._original_coordinate["atoms"].pop(index)
             last_point = self._points.pop(index)
         else:
@@ -264,17 +264,20 @@ class DrawingWidget(QWidget):
         self.coordinateUpdate.emit(self._original_coordinate)
         self.update()
 
-    def recombineBonds(self, index: int) -> None:
+    def recombineBonds(self, index: int) -> List:
         i = len(self._original_coordinate["bonds"]) - 1
+        deleted = []
         while i >= 0:
             if index in self._original_coordinate["bonds"][i]["endpoint_atoms"]:
                 del self._original_coordinate["bonds"][i]
                 del self._original_coordinate["lines"][i]
+                deleted.append(self._lines[i])
                 del self._lines[i]
             else:
                 self._original_coordinate["bonds"][i]["endpoint_atoms"] = [
                     atom - 1 if atom > index else atom for atom in self._original_coordinate["bonds"][i]["endpoint_atoms"]]
             i -= 1
+        return deleted
                 
     def lineCenter(self, line: QLine) -> QPoint:
         x_center = (line.x1() + line.x2()) / 2
@@ -298,7 +301,7 @@ class DrawingWidget(QWidget):
         for i in range(len(self._points)):
             distance = (position - self._points[i]).manhattanLength()
             if distance <= threshold:
-                 self.recombineBonds(i)
+                 deleted_lined = self.recombineBonds(i)
                  self.deletePoint(i)
                  return
         
