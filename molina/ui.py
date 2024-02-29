@@ -1,7 +1,7 @@
 ''''''
 import json, copy, re
 
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Any, Union, Tuple
 import numpy.typing as npt
 
 from PySide6.QtCore import (
@@ -138,13 +138,14 @@ class DrawingAction:
                 self.widget.addPoint(data, False)
             elif action_type == 'add_line':
                 # Undo add_line by removing the last line
-                self.widget.deleteLine(False)
+                self.widget.deleteLine(-1, False)
             elif action_type == 'delete_line':
                 # Undo delete_line by re-adding the line
                 self.widget.addLine(data, False)
             elif action_type == 'clear_all':
-                self.widget.updateCoordinates(data)
-                self.widget.coordinateUpdate.emit(data)
+                self.widget.updateCoordinates(data, True)
+            elif action_type == 'delete_point_and_lines': 
+                self.widget.undoDeletePointAndLines(data)
 
 
 class DrawingWidget(QWidget):
@@ -250,13 +251,9 @@ class DrawingWidget(QWidget):
         self.coordinateUpdate.emit(self._original_coordinate)
         self.update()
     
-    def deletePoint(self, index=-1, flag_undo: bool = True) -> None:
-        if index != -1:
-            self._original_coordinate["atoms"].pop(index)
-            last_point = self._points.pop(index)
-        else:
-            self._original_coordinate["atoms"].pop()
-            last_point = self._points.pop()
+    def deletePoint(self, flag_undo: bool = True) -> None:
+        self._original_coordinate["atoms"].pop()
+        last_point = self._points.pop()
         
         if flag_undo:
             self.action_manager.addAction(last_point, "delete_point")
@@ -264,21 +261,37 @@ class DrawingWidget(QWidget):
         self.coordinateUpdate.emit(self._original_coordinate)
         self.update()
 
-    def recombineBonds(self, index: int) -> List:
+    def recombineDeletedBonds(self, index: int) -> None:
         i = len(self._original_coordinate["bonds"]) - 1
-        deleted = []
+        
         while i >= 0:
             if index in self._original_coordinate["bonds"][i]["endpoint_atoms"]:
                 del self._original_coordinate["bonds"][i]
                 del self._original_coordinate["lines"][i]
-                deleted.append(self._lines[i])
                 del self._lines[i]
             else:
                 self._original_coordinate["bonds"][i]["endpoint_atoms"] = [
                     atom - 1 if atom > index else atom for atom in self._original_coordinate["bonds"][i]["endpoint_atoms"]]
+            
             i -= 1
-        return deleted
                 
+    def deletePointAndLine(self, index: int) -> None:
+        self.action_manager.addAction(copy.deepcopy(self._original_coordinate), "delete_point_and_lines")
+        self._original_coordinate["atoms"].pop(index)
+        self._points.pop(index)
+
+        self.recombineDeletedBonds(index)
+        
+        self.coordinateUpdate.emit(self._original_coordinate)
+        self.update()
+    
+    def undoDeletePointAndLines(self, data: Tuple) -> None:
+        self._original_coordinate = data.copy()
+
+        self.coordinateUpdate.emit(self._original_coordinate)
+        self.updateDrawScale()
+        self.update()
+
     def lineCenter(self, line: QLine) -> QPoint:
         x_center = (line.x1() + line.x2()) / 2
         y_center = (line.y1() + line.y2()) / 2
@@ -301,8 +314,7 @@ class DrawingWidget(QWidget):
         for i in range(len(self._points)):
             distance = (position - self._points[i]).manhattanLength()
             if distance <= threshold:
-                 deleted_lined = self.recombineBonds(i)
-                 self.deletePoint(i)
+                 self.deletePointAndLine(i)
                  return
         
         for i in range(len(self._lines)):
@@ -326,7 +338,7 @@ class DrawingWidget(QWidget):
             raise TypeError()
     
     def updateDrawScale(self) -> None:
-        if len(self._lines) == 0:
+        if len(self._lines) != len(self._original_coordinate["lines"]):
             self._lines = copy.deepcopy(self._original_coordinate["lines"])
         for i in range(len(self._original_coordinate["lines"])):
             line = self._original_coordinate["lines"][i]
@@ -337,7 +349,7 @@ class DrawingWidget(QWidget):
                 line.p2().x() * self._zoom_factor,
                 line.p2().y() * self._zoom_factor))
             
-        if len(self._points) == 0:
+        if len(self._points) != len(self._original_coordinate["atoms"]):
             self._points = [QPoint() for i in range(len(self._original_coordinate["atoms"]))]
         for i in range(len(self._original_coordinate["atoms"])):
             point = self._original_coordinate["atoms"][i]
@@ -382,8 +394,8 @@ class DrawingWidget(QWidget):
             self.addLine(self.temp_line)
             self.temp_line = None
 
-    def updateCoordinates(self, coordinates) -> None:
-        self._original_coordinate = coordinates
+    def updateCoordinates(self, coordinates: Dict, flag_undo: bool = False) -> None:
+        self._original_coordinate = coordinates.copy()
         self._original_coordinate["lines"] = []
         self._lines = []
         self._points = []
@@ -397,11 +409,14 @@ class DrawingWidget(QWidget):
                            atoms[bond["endpoint_atoms"][1]]["y"])
                     )
             )
-
+        if flag_undo:
+            self.coordinateUpdate.emit(self._original_coordinate)
+        
         self.updateDrawScale()
         self.update()
     
     def clearAll(self) -> None:
+        self.action_manager.addAction(copy.deepcopy(self._original_coordinate), "delete_point_and_lines")
         if len(self._original_coordinate["atoms"]) != 0: 
             self.action_manager.addAction(self._original_coordinate, "clear_all")
             self._lines = []
