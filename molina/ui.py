@@ -706,8 +706,13 @@ class MainWindow(QMainWindow):
                 for internal_key, internal_value in item.items(): 
                     annotation_pretty = annotation_pretty + tab + str(internal_key) + ': ' + str(internal_value) + '\n'
                 annotation_pretty += '\n'
+        
+        scrollbar = self.text_widget.verticalScrollBar()
+        current_pos = scrollbar.value()
 
         self.text_widget.setText(annotation_pretty)
+
+        scrollbar.setValue(current_pos)
 
     def startPrediction(self) -> None:
         if not self.central_widget.hasPixmap():
