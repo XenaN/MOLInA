@@ -735,8 +735,7 @@ class MainWindow(QMainWindow):
 
     def onModelCompleted(self, model_result: Dict) -> None:
         if model_result:
-            model_result_json = json.dumps(model_result, indent=4, sort_keys=True)
-            self.text_widget.setText(model_result_json)
+            self.changeAnnotation(model_result)
             self.data_images.draw_annotation()
         
         self.file_widget.setEnabled(True)
