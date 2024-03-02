@@ -1,5 +1,5 @@
 ''''''
-import json, copy, re
+import copy, math
 
 from typing import List, Dict, Any, Union, Tuple
 import numpy.typing as npt
@@ -99,6 +99,45 @@ class FileManager(QWidget):
                 self.itemSelected.emit(path)
 
 
+class TypedLine:
+    def __init__(self, line: QLine, type: str, distance: float):
+        self.line = line
+        self.type = type
+        self.distance = distance
+    
+    def calculateParallelLines(self) -> Tuple[float]:
+        # Calculate the direction vector of the line
+        dx = self.line.x2() - self.line.x1()
+        dy = self.line.y2() - self.line.y1()
+
+        # Length of the direction vector
+        length = math.sqrt(dx**2 + dy**2)
+
+        if length != 0:
+            ux = dx / length
+            uy = dy / length
+
+            return -uy, ux
+
+    def draw(self, painter: QPainter):
+        if self.type == "single":
+            painter.drawLine(self.line)
+
+        elif self.type == "double":
+            px, py = self.calculateParallelLines()
+            painter.drawLine(QLine(self.line.x1() + self.distance * px, self.line.y1() + self.distance * py, 
+                                   self.line.x2() + self.distance * px, self.line.y2() + self.distance * py))
+            painter.drawLine(QLine(self.line.x1() - self.distance * px, self.line.y1() - self.distance * py, 
+                                   self.line.x2() - self.distance * px, self.line.y2() - self.distance * py))
+        elif self.type == "triple":
+            px, py = self.calculateParallelLines()
+            painter.drawLine(self.line)
+            painter.drawLine(QLine(self.line.x1() + self.distance * px, self.line.y1() + self.distance * py, 
+                                   self.line.x2() + self.distance * px, self.line.y2() + self.distance * py))
+            painter.drawLine(QLine(self.line.x1() - self.distance * px, self.line.y1() - self.distance * py, 
+                                   self.line.x2() - self.distance * px, self.line.y2() - self.distance * py))
+
+
 class FileAction:
     def __init__(self):
         self.recent_images = []
@@ -111,7 +150,6 @@ class FileAction:
 
     def getRecentImages(self):
         return self.recent_images
-
 
 class DrawingAction:
     def __init__(self, widget):
@@ -154,13 +192,15 @@ class DrawingWidget(QWidget):
         super().__init__(parent)
         self._lines = []
         self._points = []
-        self.temp_line = None
+        self._temp_line = None
         self._atom_type = None
         self._bond_type = None
         self._zoom_factor = 1.0
+        self._bond_distance = None
+        self._closest_atom_threshold = None
         self._drawing_line_enabled = False
         self._drawing_point_enabled = False
-        self.action_manager = DrawingAction(self)
+        self._action_manager = DrawingAction(self)
         self.setFocusPolicy(Qt.StrongFocus)
         self._original_coordinate = {"bonds": [],
                                      "lines": [],
@@ -172,19 +212,20 @@ class DrawingWidget(QWidget):
         painter.setPen(pen)
 
         for line in self._lines:
-            painter.drawLine(line)
+            line.draw(painter)
 
         for point in self._points:
             painter.drawPoint(point)
 
-        if self.temp_line:
-            painter.drawLine(self.temp_line)
-        
-        # painter.setBrush(QColor(150, 150, 100, 100))
-        # painter.drawRect(self.rect())
+        if self._temp_line:
+            self._temp_line.draw(painter)
+    
+    def getScaledThresholds(self, threshold: float) -> float:
+        value = threshold * self._zoom_factor
+        return 3 if value < 3 else 100 if value > 100 else value
 
-    def findAtoms(self, line: QLine, threshold: int = 20) -> Dict:
-        #TODO: threshold as % of size image
+    def findAtoms(self, line: QLine) -> Dict:
+        threshold = self._closest_atom_threshold
         close_point = {}
         for i, atom in enumerate(self._original_coordinate["atoms"]):
             point = QPoint(atom["x"], atom["y"])
@@ -200,40 +241,42 @@ class DrawingWidget(QWidget):
         else:
             return
 
-    def addLine(self, line: QLine, flag_undo: bool = True) -> None:
-        not_scaled_line = QLine(line.x1() / self._zoom_factor, 
-                                line.y1() / self._zoom_factor,
-                                line.x2() / self._zoom_factor,
-                                line.y2() / self._zoom_factor)
-        
-        atoms = self.findAtoms(not_scaled_line)
+    def addLine(self, line: TypedLine, flag_undo: bool = True) -> None:
+        atoms = self.findAtoms(line.line)
         if atoms:
-            self._lines.append(line)
+            scaled_line = QLine(line.line.x1() * self._zoom_factor, 
+                                line.line.y1() * self._zoom_factor,
+                                line.line.x2() * self._zoom_factor,
+                                line.line.y2() * self._zoom_factor)
+            self._lines.append(TypedLine(scaled_line,
+                                         line.type, 
+                                         line.distance))
+
             if flag_undo:
-                self.action_manager.addAction(line, "add_line")
+                self._action_manager.addAction(line, "add_line")
             
-            self._original_coordinate["lines"].append(not_scaled_line)
+            self._original_coordinate["lines"].append(line)
             self._original_coordinate["bonds"].append({"bond_type": self._bond_type,
                                                        "endpoint_atoms": list(atoms.keys())})
             
             self.coordinateUpdate.emit(self._original_coordinate)
         else: 
-            self.temp_line = None
+            self._temp_line = None
 
         self.update()
     
     def deleteLine(self, index=-1, flag_undo: bool = True) -> None:
         if index != -1:
             self._original_coordinate["bonds"].pop(index)
-            self._original_coordinate["lines"].pop(index)
-            last_line = self._lines.pop(index)
+            last_line  = self._original_coordinate["lines"].pop(index)
+            self._lines.pop(index)
         else:
             self._original_coordinate["bonds"].pop()
-            self._original_coordinate["lines"].pop()
-            last_line = self._lines.pop()
+            last_line  = self._original_coordinate["lines"].pop()
+            self._lines.pop()
         
         if flag_undo:
-            self.action_manager.addAction(last_line, "delete_line")
+            self._action_manager.addAction(last_line, "delete_line")
 
         self.coordinateUpdate.emit(self._original_coordinate)
         self.update()
@@ -245,7 +288,7 @@ class DrawingWidget(QWidget):
             "y": point.y() / self._zoom_factor})
         
         if flag_undo:
-            self.action_manager.addAction(point, "add_point")
+            self._action_manager.addAction(point, "add_point")
         self._points.append(point)
 
         self.coordinateUpdate.emit(self._original_coordinate)
@@ -256,7 +299,7 @@ class DrawingWidget(QWidget):
         last_point = self._points.pop()
         
         if flag_undo:
-            self.action_manager.addAction(last_point, "delete_point")
+            self._action_manager.addAction(last_point, "delete_point")
         
         self.coordinateUpdate.emit(self._original_coordinate)
         self.update()
@@ -276,7 +319,7 @@ class DrawingWidget(QWidget):
             i -= 1
                 
     def deletePointAndLine(self, index: int) -> None:
-        self.action_manager.addAction(copy.deepcopy(self._original_coordinate), "delete_point_and_lines")
+        self._action_manager.addAction(copy.deepcopy(self._original_coordinate), "delete_point_and_lines")
         self._original_coordinate["atoms"].pop(index)
         self._points.pop(index)
 
@@ -301,26 +344,41 @@ class DrawingWidget(QWidget):
         x = center.x() + part * (end_line.x() - center.x())
         y = center.y() + part * (end_line.y() - center.y())
         return QPoint(x, y)
+    
+    def create_tolerance_rectangle(self, start: QPoint, end: QPoint, tolerance: int) -> QRect:
+        if start.x() == end.x():  # Vertical line
+            return QRect(start.x() - tolerance // 2, min(start.y(), end.y()),
+                        tolerance, abs(start.y() - end.y()))
+        elif start.y() == end.y():  # Horizontal line
+            return QRect(min(start.x(), end.x()), start.y() - tolerance // 2,
+                        abs(start.x() - end.x()), tolerance)
+        else:
+            # For non-axis-aligned lines, additional logic is needed
+            # Depending on your requirements, this can be more complex
+            return None
 
     def isPointOnLineSegment(self, start: QPoint, end: QPoint, point: QPoint) -> bool:
+        tolerance_rect = self.create_tolerance_rectangle(start, end, self.getScaledThresholds(self._bond_distance))
+        if tolerance_rect:
+            return tolerance_rect.contains(point)
+        
         line_length = (start - end).manhattanLength()
         d1 = (point - start).manhattanLength()
         d2 = (point - end).manhattanLength()
-
         return abs(d1 + d2 - line_length) < 1e-5 
 
-    def findClosestObject(self, position, threshold: int = 20) -> None:
-        #TODO: threshold as % of size image
+    def findClosestObject(self, position: QPoint) -> None:
+        threshold = self.getScaledThresholds(self._closest_atom_threshold)
         for i in range(len(self._points)):
             distance = (position - self._points[i]).manhattanLength()
             if distance <= threshold:
                  self.deletePointAndLine(i)
                  return
-        
+
         for i in range(len(self._lines)):
-            center = self.lineCenter(self._lines[i])
-            part_P1 = self.partLine(self._lines[i].p1(), center)
-            part_P2 = self.partLine(self._lines[i].p2(), center)
+            center = self.lineCenter(self._lines[i].line)
+            part_P1 = self.partLine(self._lines[i].line.p1(), center)
+            part_P2 = self.partLine(self._lines[i].line.p2(), center)
             if self.isPointOnLineSegment(part_P1, part_P2, position):
                 self.deleteLine(i)
                 return
@@ -342,12 +400,12 @@ class DrawingWidget(QWidget):
             self._lines = copy.deepcopy(self._original_coordinate["lines"])
         for i in range(len(self._original_coordinate["lines"])):
             line = self._original_coordinate["lines"][i]
-            self._lines[i].setP1(QPoint(
-                line.p1().x() * self._zoom_factor,
-                line.p1().y() * self._zoom_factor))
-            self._lines[i].setP2(QPoint(
-                line.p2().x() * self._zoom_factor,
-                line.p2().y() * self._zoom_factor))
+            self._lines[i].line = QLine(
+                line.line.x1() * self._zoom_factor,
+                line.line.y1() * self._zoom_factor,
+                line.line.x2() * self._zoom_factor,
+                line.line.y2() * self._zoom_factor)
+            self._lines[i].distance = self.getScaledThresholds(self._original_coordinate["lines"][i].distance)
             
         if len(self._points) != len(self._original_coordinate["atoms"]):
             self._points = [QPoint() for i in range(len(self._original_coordinate["atoms"]))]
@@ -356,6 +414,11 @@ class DrawingWidget(QWidget):
             self._points[i].setX(point["x"] * self._zoom_factor)
             self._points[i].setY(point["y"] * self._zoom_factor)
     
+    def setThresholds(self, image_size: QSize) -> None:
+        smallest_dim = min(image_size.width(), image_size.height())
+        self._bond_distance = smallest_dim * 0.02
+        self._closest_atom_threshold = smallest_dim * 0.02
+
     def setZoomFactor(self, factor: float) -> None:
         self._zoom_factor = factor
         self.update()
@@ -366,11 +429,13 @@ class DrawingWidget(QWidget):
     def cleanDrawingWidget(self) -> None:
         self._lines = []
         self._points = []
-        self.temp_line = None
+        self._temp_line = None
         self._zoom_factor = 1.0
+        self._bond_distance = None
+        self._closest_atom_threshold = None
         self._drawing_line_enabled = False
         self._drawing_point_enabled = False
-        self.action_manager = DrawingAction(self)
+        self._action_manager = DrawingAction(self)
         self._original_coordinate = {"bonds": [],
                                      "lines": [],
                                      "atoms": []}
@@ -380,19 +445,30 @@ class DrawingWidget(QWidget):
             if self._drawing_point_enabled:
                 self.addPoint(event.pos())
             elif self._drawing_line_enabled:
-                self.temp_line = QLine(event.pos(), event.pos())
+                self._temp_line = TypedLine(QLine(event.pos(), event.pos()),
+                                            self._bond_type, 
+                                            self.getScaledThresholds(self._bond_distance))
+                
         elif event.button() == Qt.RightButton:
             self.findClosestObject(event.pos())
     
     def mouseMoveEvent(self, event) -> None:
         if self._drawing_line_enabled:
-            self.temp_line.setP2(event.pos())
+            self._temp_line.line.setP2(event.pos())
             self.update()
     
     def mouseReleaseEvent(self, event) -> None:
         if event.button() == Qt.LeftButton and self._drawing_line_enabled:
-            self.addLine(self.temp_line)
-            self.temp_line = None
+            not_scaled_line = TypedLine(
+                QLine(self._temp_line.line.x1() / self._zoom_factor, 
+                      self._temp_line.line.y1() / self._zoom_factor,
+                      self._temp_line.line.x2() / self._zoom_factor,
+                      self._temp_line.line.y2() / self._zoom_factor),
+                self._bond_type,
+                self.getScaledThresholds(self._bond_distance)      
+            )
+            self.addLine(not_scaled_line)
+            self._temp_line = None
 
     def updateCoordinates(self, coordinates: Dict, flag_undo: bool = False) -> None:
         self._original_coordinate = coordinates.copy()
@@ -402,13 +478,16 @@ class DrawingWidget(QWidget):
         atoms = self._original_coordinate["atoms"]
         for bond in self._original_coordinate["bonds"]:
             self._original_coordinate["lines"].append(
-                QLine(
-                    QPoint(atoms[bond["endpoint_atoms"][0]]["x"],
-                           atoms[bond["endpoint_atoms"][0]]["y"]),
-                    QPoint(atoms[bond["endpoint_atoms"][1]]["x"],
-                           atoms[bond["endpoint_atoms"][1]]["y"])
-                    )
-            )
+                TypedLine(
+                    QLine(
+                        QPoint(atoms[bond["endpoint_atoms"][0]]["x"],
+                            atoms[bond["endpoint_atoms"][0]]["y"]),
+                        QPoint(atoms[bond["endpoint_atoms"][1]]["x"],
+                            atoms[bond["endpoint_atoms"][1]]["y"])
+                        ),
+                        bond["bond_type"],
+                        self.getScaledThresholds(self._bond_distance)
+            ))
         if flag_undo:
             self.coordinateUpdate.emit(self._original_coordinate)
         
@@ -416,12 +495,12 @@ class DrawingWidget(QWidget):
         self.update()
     
     def clearAll(self) -> None:
-        self.action_manager.addAction(copy.deepcopy(self._original_coordinate), "delete_point_and_lines")
+        self._action_manager.addAction(copy.deepcopy(self._original_coordinate), "delete_point_and_lines")
         if len(self._original_coordinate["atoms"]) != 0: 
-            self.action_manager.addAction(self._original_coordinate, "clear_all")
+            self._action_manager.addAction(self._original_coordinate, "clear_all")
             self._lines = []
             self._points = []
-            self.temp_line = None
+            self._temp_line = None
             self._original_coordinate = {"bonds": [],
                                         "lines": [],
                                         "atoms": []}
@@ -430,14 +509,26 @@ class DrawingWidget(QWidget):
     
     def keyPressEvent(self, event: QPaintEvent) -> None:
         super().keyPressEvent(event)
+        
+        if self._drawing_line_enabled:
+            self._drawing_line_enabled = False
+        elif self._drawing_point_enabled:
+            self._drawing_point_enabled = False
+
         if event.key() == Qt.Key_Z and event.modifiers() == Qt.ControlModifier:
-            self.action_manager.undo()
+            self._action_manager.undo()
 
         elif event.key() == Qt.Key_C:
-            self.setDrawingMode(not self._drawing_point_enabled, "point", "C")
+            self.setDrawingMode(True, "point", "C")
         
         elif event.key() == Qt.Key_1:
-            self.setDrawingMode(not self._drawing_line_enabled, "line", "single")
+            self.setDrawingMode(True, "line", "single")
+        
+        elif event.key() == Qt.Key_2:
+            self.setDrawingMode(True, "line", "double")
+
+        elif event.key() == Qt.Key_3:
+            self.setDrawingMode(True, "line", "triple")
 
 
 class CentralWidget(QWidget):
@@ -484,7 +575,6 @@ class CentralWidget(QWidget):
 
         self.image_layout.addWidget(self.container_widget)
         self.image_layout.addWidget(self.image_widget)
-        # self.setColor(self.drawing_widget, QColor(100, 250, 150, 100))
         self.setColor(self.image_widget, COLOR_BACKGROUND_WIDGETS)
 
         self.scrollArea = QScrollArea()
@@ -553,6 +643,7 @@ class CentralWidget(QWidget):
 
             self.drawing_widget.setFixedSize(scaled_pixmap.size())
             self.drawing_widget.cleanDrawingWidget()
+            self.drawing_widget.setThresholds(self._pixmap.size())
             self.setScaleFactor((scaled_pixmap.height() + scaled_pixmap.width()) / original_size)
 
     def setColor(self, widget: QWidget, color: QColor) -> None:
