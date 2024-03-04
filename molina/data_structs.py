@@ -116,11 +116,13 @@ class Dataset():
                                                      "bonds": self.images[self.current_image].bonds})
         
     def save_annotation(self) -> None:
-        with open(self.images[self.current_image].path_annotation, 'w', encoding='utf-8') as f:
-            json.dump({
-                "atoms": self.images[self.current_image].atoms,
-                "bonds": self.images[self.current_image].bonds
-            }, f, ensure_ascii=False, indent=4)
+        if self.current_image and len(self.images[self.current_image].atoms) != 0:
+
+            with open(self.images[self.current_image].path_annotation, 'w', encoding='utf-8') as f:
+                json.dump({
+                    "atoms": self.images[self.current_image].atoms,
+                    "bonds": self.images[self.current_image].bonds
+                }, f, ensure_ascii=False, indent=4)
 
     def change_current_image(self, path: str) -> None:
         '''Changes current image'''
