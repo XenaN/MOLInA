@@ -174,13 +174,6 @@ class Worker(QObject):
 
 # HINT: next two functions possibly require additional code decomposition
 
-def dataset_from_file(fs) -> Dataset:
-    '''Creates Dataset from single image file'''
-    
-    pass
-    # return
-
-
 def dataset_from_directory(path_dir) -> Dataset:
     '''Creates Dataset from directory'''
     # filter image files via os.listdir
