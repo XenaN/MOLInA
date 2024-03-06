@@ -32,8 +32,10 @@ from PySide6.QtGui import (
 
 from molina.data_structs import Dataset, Worker
 from molina.central_widget import CentralWidget
+from molina.drawing_widget import TypedLine
 from molina.action_managers import FileActionManager
 from molina.file_manager import FileManager
+from molina.data_manager import DataManager
 
 
 RESOURCES_PATH = QDir("molina/resources")
@@ -47,10 +49,10 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("MOLInA")
 
-        self.data_images = Dataset(images = {})
+        self.data_images = Dataset(_images = {})
 
-        self.data_images.current_image_signal.current_image.connect(self.changeImage)
-        self.data_images.current_image_signal.current_annotation.connect(self.changeAnnotation)
+        self.data_images._current_image_signal.current_image.connect(self.changeImage)
+        self.data_images._current_image_signal.current_annotation.connect(self.changeAnnotation)
 
         self.page_layout = QHBoxLayout()
         self.splitter =  QSplitter(self)
@@ -59,9 +61,14 @@ class MainWindow(QMainWindow):
         
         self.central_widget = CentralWidget()
         self.setColor(self.central_widget, COLOR_BACKGROUND_WIDGETS)
-        self.central_widget.drawing_widget.coordinateUpdate.connect(self.addPointToDataset)
-        self.data_images.current_image_signal.data_changed.connect(
-            self.central_widget.drawing_widget.updateCoordinates)
+        self.central_widget.drawing_widget.pointUpdate.connect(self.addPointToDataManager)
+        self.central_widget.drawing_widget.lineUpdate.connect(self.addLineToDataManager)
+        
+        # self.data_manager = DataManager()
+        # self.data_manager.dataUpdateToDataset.connect(self.data_images.update_coordinates)
+        # self.data_manager.newDataToDrawingWidget.connect(self.central_widget.drawing_widget.updateDrawScale)
+        # self.data_manager.pointUpdate.connect(self.central_widget.drawing_widget.updatePoint)
+        # self.data_manager.lineUpdate.connect(self.central_widget.drawing_widget.updateLine)
 
         self.file_widget = FileManager(self)
         self.file_widget.itemSelected.connect(self.changeCurrentImage)
@@ -165,8 +172,6 @@ class MainWindow(QMainWindow):
         if file_dialog.exec_():
             selected_file = file_dialog.selectedFiles()[0]
             self.changeCurrentImage(selected_file)
-
-            self.fileAction.addRecentImage(selected_file)
         
     def changeCurrentImage(self, path: str) -> None:
         self.fileAction.addRecentImage(path)
@@ -222,8 +227,11 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event: QPaintEvent) -> None:
         self.central_widget.setPixmapSize()   
 
-    def addPointToDataset(self, coordinate: Dict) -> None:
-        self.data_images.add_coordinates(coordinate)
+    def addPointToDataManager(self, point: Dict, index: int) -> None:
+        self.data_manager.addAtom(point)
+    
+    def addLineToDataManager(self, line: TypedLine, endpoint: List, index: int) -> None:
+        self.data_manager.addBond(line, endpoint)
 
     def setColor(self, widget: QWidget, color: QColor) -> None:
         widget.setAutoFillBackground(True)

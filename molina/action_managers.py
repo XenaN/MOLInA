@@ -1,3 +1,5 @@
+from typing import Union, List
+
 class FileActionManager:
     def __init__(self):
         self.recent_images = []
@@ -7,8 +9,11 @@ class FileActionManager:
             self.recent_images.remove(image_path)
 
         self.recent_images.insert(0, image_path)
+    
+        if len(self.recent_images) > 10:
+            self.recent_images.pop()
 
-    def getRecentImages(self):
+    def getRecentImages(self) -> List:
         return self.recent_images
 
 class DrawingActionManager:
@@ -17,10 +22,10 @@ class DrawingActionManager:
         self.action_history = []
         self.max_actions = 15
 
-    def addAction(self, action, action_type):
+    def addAction(self, id: Union[List, int], action_type):
         if len(self.action_history) >= self.max_actions:
             self.action_history.pop(0)
-        self.action_history.append({'type': action_type, 'data': action})
+        self.action_history.append({'type': action_type, 'ids': id})
 
     def undo(self):
         if self.action_history:
@@ -28,19 +33,18 @@ class DrawingActionManager:
             action_type = last_action['type']
             data = last_action['data']
 
-            if action_type == 'add_point':
+            if action_type == 'add_atom':
                 # Undo add_point by removing the last point
-                self.widget.deletePoint(False)
-            elif action_type == 'delete_point':
+                self.widget.undoAddAtom(data)
+            elif action_type == 'delete_atom':
                 # Undo delete_point by re-adding the point
-                self.widget.addPoint(data, False)
-            elif action_type == 'add_line':
+                self.widget.undoDeleteAtom(data)
+            elif action_type == 'add_bond':
                 # Undo add_line by removing the last line
-                self.widget.deleteLine(-1, False)
-            elif action_type == 'delete_line':
+                self.widget.undoAddBond(data)
+            elif action_type == 'delete_bond':
                 # Undo delete_line by re-adding the line
-                self.widget.addLine(data, False)
-            elif action_type == 'clear_all':
-                self.widget.updateCoordinates(data, True)
-            elif action_type == 'delete_point_and_lines': 
-                self.widget.undoDeletePointAndLines(data)
+                self.widget.undoDeleteBond(data)
+            elif action_type == "delete_atom_and_bond":
+                self.widget.undoDeleteAtomAndBond(data)
+

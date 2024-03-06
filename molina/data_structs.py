@@ -15,6 +15,8 @@ from PySide6.QtCore import QObject, Signal
 
 from molscribe import MolScribe
 
+from molina.data_manager import DataManager
+
 
 MOLSCRIBE = './models/molscribe_aux_1m.pth'
 
@@ -29,9 +31,9 @@ class ImageData():
     '''Path to the annotation file'''
     image: np.array
     '''Numpy-array representation of the image'''
-    atoms: Optional[List[Dict[str, float]]]  = field(default_factory=list) # define type more precisely (list of tuples of 2 floats and strs? or better specifical data structure)
+    atoms: Optional[List[Dict[str, float]]]  = field(default_factory=list) 
     '''List of recognized atoms and their parameters'''
-    bonds: Optional[List[Dict[str, Any]]]  = field(default_factory=list)# define type more precisely (list of tuples of 2 ints and str? or better specifical data structure)
+    bonds: Optional[List[Dict[str, Any]]]  = field(default_factory=list)
     '''List of recognized bonds and their parameters'''
     
     def run_molscribe(self) -> None:
@@ -61,21 +63,23 @@ class ImageSignals(QObject):
 class Dataset():
     '''Represents list of molecular images forming one dataset'''
 
-    images: Dict[str, ImageData] # Dict поддерживает insertion order
+    _images: Dict[str, ImageData] # Dict поддерживает insertion order
     '''Dictionary of images forming the dataset'''
-    num_images: int = 10
+    _num_images: int = 10
     '''Total number of images in dataset'''
-    current_image: str = ''
+    _current_image: str = ''
     '''Index of the current image'''
-    current_model: str = "MolScribe"
+    _current_model: str = "MolScribe"
     '''Current model for prediction atoms and bonds'''
 
     def __post_init__(self) -> None:
-        self.current_image_signal = ImageSignals()
+        self._current_image_signal = ImageSignals()
         self.model_map = {"MolScribe": self.run_molscribe_predict, "another": None}
+        self._data_manager = DataManager()
+        self._data_manager.dataUpdateToDataset.connect(self.update_coordinates)
     
     def set_current_model(self, model_name: str) -> None:
-        self.current_model = model_name
+        self._current_model = model_name
 
     def open_image(self, path: str) -> npt.NDArray:
         image = cv2.imread(path, cv2.IMREAD_UNCHANGED) 
@@ -90,67 +94,71 @@ class Dataset():
             return
     
     def run_molscribe_predict(self) -> npt.NDArray:
-        self.images[self.current_image].atoms = []
-        self.images[self.current_image].bonds = []
-        self.images[self.current_image].run_molscribe()
+        self._images[self._current_image].atoms = []
+        self._images[self._current_image].bonds = []
+        self._images[self._current_image].run_molscribe()
 
-        return self.images[self.current_image]
+        return self._images[self._current_image]
     
-    def add_coordinates(self, coordinates: Dict) -> None:
-        new_annotation = copy.deepcopy(coordinates)
-        for atom in new_annotation["atoms"]:
-            atom['x'] /= self.images[self.current_image].image.shape[1]
-            atom['y'] /= self.images[self.current_image].image.shape[0]
+    def update_coordinates(self, coordinates: Dict) -> None:
+        if len(coordinates["atoms"]) != 0:
+            for atom in coordinates["atoms"]:
+                atom['x'] /= self._images[self._current_image].image.shape[1]
+                atom['y'] /= self._images[self._current_image].image.shape[0]
 
-        self.images[self.current_image].atoms = new_annotation["atoms"]
-        self.images[self.current_image].bonds = new_annotation["bonds"]
-        self.current_image_signal.current_annotation.emit({"atoms": self.images[self.current_image].atoms,
-                                                          "bonds": self.images[self.current_image].bonds})
+            self._images[self._current_image].atoms = coordinates["atoms"]
+            self._images[self._current_image].bonds = coordinates["bonds"]
+        else:
+            self._images[self._current_image].atoms = []
+            self._images[self._current_image].bonds = []
+
+        self._current_image_signal.current_annotation.emit({"atoms": self._images[self._current_image].atoms,
+                                                            "bonds": self._images[self._current_image].bonds})
     
     def draw_annotation(self) -> None:
-        atoms = copy.deepcopy(self.images[self.current_image].atoms)
+        atoms = copy.deepcopy(self._images[self._current_image].atoms)
         for atom in atoms:
-            atom['x'] *= self.images[self.current_image].image.shape[1]
-            atom['y'] *= self.images[self.current_image].image.shape[0]
-        self.current_image_signal.data_changed.emit({"atoms": atoms,
-                                                     "bonds": self.images[self.current_image].bonds})
+            atom['x'] *= self._images[self._current_image].image.shape[1]
+            atom['y'] *= self._images[self._current_image].image.shape[0]
+        self._data_manager.sendNewDataToDrawingWidget({"atoms": atoms,
+                                                       "bonds": self._images[self._current_image].bonds})
         
     def save_annotation(self) -> None:
-        if self.current_image and len(self.images[self.current_image].atoms) != 0:
+        if self._current_image and len(self._images[self._current_image].atoms) != 0:
 
-            with open(self.images[self.current_image].path_annotation, 'w', encoding='utf-8') as f:
+            with open(self._images[self._current_image].path_annotation, 'w', encoding='utf-8') as f:
                 json.dump({
-                    "atoms": self.images[self.current_image].atoms,
-                    "bonds": self.images[self.current_image].bonds
+                    "atoms": self._images[self._current_image].atoms,
+                    "bonds": self._images[self._current_image].bonds
                 }, f, ensure_ascii=False, indent=4)
 
     def change_current_image(self, path: str) -> None:
         '''Changes current image'''
-        self.current_image = path
-        if path not in self.images:
+        self._current_image = path
+        if path not in self._images:
             image = self.open_image(path)
             annotation_path = Path.joinpath(Path(path).parent.resolve(),
                                             Path(path).stem + '.json')
             annotation = self.check_annotation(annotation_path)
             if annotation:
-                self.images[path] = ImageData(path, 
+                self._images[path] = ImageData(path, 
                                               annotation_path,
                                               image,
                                               annotation["atoms"], 
                                               annotation["bonds"])
             else:
-                self.images[path] = ImageData(path,
+                self._images[path] = ImageData(path,
                                               annotation_path,
                                               image)
-            if len(self.images) > 10:
-                oldest_key = list(self.images.keys())[0]
-                self.images.pop(oldest_key)
+            if len(self._images) > 10:
+                oldest_key = list(self._images.keys())[0]
+                self._images.pop(oldest_key)
 
-        self.current_image_signal.current_image.emit(self.images[path].image)
-        self.current_image_signal.current_annotation.emit({"atoms": self.images[path].atoms,
-                                                           "bonds": self.images[path].bonds})
+        self._current_image_signal.current_image.emit(self._images[path].image)
+        self._current_image_signal.current_annotation.emit({"atoms": self._images[path].atoms,
+                                                           "bonds": self._images[path].bonds})
 
-        if len(self.images[path].atoms) != 0:
+        if len(self._images[path].atoms) != 0:
             self.draw_annotation()
         
         
