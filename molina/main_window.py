@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Union, Tuple
+from typing import List, Dict, Any
 import numpy.typing as npt
 
 from PySide6.QtCore import (
@@ -61,14 +61,6 @@ class MainWindow(QMainWindow):
         
         self.central_widget = CentralWidget()
         self.setColor(self.central_widget, COLOR_BACKGROUND_WIDGETS)
-        self.central_widget.drawing_widget.pointUpdate.connect(self.addPointToDataManager)
-        self.central_widget.drawing_widget.lineUpdate.connect(self.addLineToDataManager)
-        
-        # self.data_manager = DataManager()
-        # self.data_manager.dataUpdateToDataset.connect(self.data_images.update_coordinates)
-        # self.data_manager.newDataToDrawingWidget.connect(self.central_widget.drawing_widget.updateDrawScale)
-        # self.data_manager.pointUpdate.connect(self.central_widget.drawing_widget.updatePoint)
-        # self.data_manager.lineUpdate.connect(self.central_widget.drawing_widget.updateLine)
 
         self.file_widget = FileManager(self)
         self.file_widget.itemSelected.connect(self.changeCurrentImage)
@@ -100,7 +92,6 @@ class MainWindow(QMainWindow):
         self.button_save.pressed.connect(self.data_images.save_annotation)
         self.toolbar_main.addWidget(self.button_save)
 
-        # TODO: when click on right mouse button give list of current cache 
         self.button_left = QToolButton()
         self.button_left.setIcon(QIcon(RESOURCES_PATH.filePath("left_button.png")))
         self.toolbar_main.addWidget(self.button_left)
@@ -178,15 +169,14 @@ class MainWindow(QMainWindow):
         self.imagePathSelected.emit(path)
     
     def changeAnnotation(self, annotation: Dict[str, List[Any]]) -> None:
-        # annotation_json = json.dumps(annotation, indent=4, sort_keys=False)
         annotation_pretty = ''
         tab = '        '
         for key in annotation.keys():
             annotation_pretty = annotation_pretty + str(key) + ':\n' 
-            for i, item in enumerate(annotation[key]):
-                if key == "atoms":
-                    annotation_pretty = annotation_pretty + tab + "atom_number: " + str(i) + '\n'
+            for item in annotation[key]:
                 for internal_key, internal_value in item.items(): 
+                    if internal_key == "confidence" and internal_value is None:
+                        continue
                     annotation_pretty = annotation_pretty + tab + str(internal_key) + ': ' + str(internal_value) + '\n'
                 annotation_pretty += '\n'
         

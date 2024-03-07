@@ -10,7 +10,7 @@ from molina.action_managers import DrawingActionManager
 
 class DataManager(QObject):
     dataUpdateToDataset = Signal(object)
-    newDataToDrawingWidget = Signal(object)
+    newDataToDrawingWidget = Signal()
     pointUpdate = Signal(object)
     lineUpdate = Signal(object)
     """
@@ -73,7 +73,7 @@ class DataManager(QObject):
             atoms_data = filtered_atoms.drop(columns=["id", "atom_instance", "deleted"]).to_dict(orient="records")
 
             filtered_bonds = self._bonds[self._bonds["deleted"] != True]
-            bonds_data = filtered_bonds[["type", "endpoint", "confidence"]].to_dict(orient="records")
+            bonds_data = filtered_bonds[["type", "endpoint_atoms", "confidence"]].to_dict(orient="records")
 
             self.dataUpdateToDataset.emit({"atoms": atoms_data,
                                        "bonds": bonds_data})
@@ -115,7 +115,7 @@ class DataManager(QObject):
 
         self._bonds["line_instance"] = lines
 
-        self.newDataToDrawingWidget.emit(self.prepareDataToDrawingWidget())
+        self.newDataToDrawingWidget.emit()
     
     def addAtom(self, atom: Atom, index: int) -> None:
         self._atoms.loc[len(self._atoms)] = [
@@ -188,8 +188,11 @@ class DataManager(QObject):
             self._action_manager.addAction(uid, "delete_atom")
 
     def updateDistances(self, text_size: int, bond_distance: float) -> None:
-        self._atoms["atom_instance"] = self._atoms["atom_instance"].apply(lambda atom: setattr(atom, 'size', text_size))
-        self._bonds["line_instance"] = self._bonds["line_instance"].apply(lambda bond: setattr(bond, 'distance', bond_distance))
+        for idx in self._atoms.index:
+            self._atoms.at[idx, "atom_instance"].size = text_size
+        
+        for idx in self._bonds.index:
+            self._bonds.at[idx, "line_instance"].size = bond_distance
 
     def getDrawingData(self) -> None:
         return self.prepareDataToDrawingWidget()
@@ -205,10 +208,9 @@ class DataManager(QObject):
     
     def cleanAll(self) -> None:
         self._bonds = pd.DataFrame(columns=["id",
+                                            "line_number",
                                             "line_instance",
-                                            "line",
                                             "type",
-                                            "distance",
                                             "endpoint_atoms",
                                             "confidence",
                                             "deleted"])
@@ -226,50 +228,53 @@ class DataManager(QObject):
 
         self._action_manager = DrawingActionManager(self)
         # self.sendDataToDataset()
+    
+    def undo(self) -> None:
+        self._action_manager.undo()
 
-    def undoAddAtom(self, uid: int):
+    def undoAddAtom(self, uid: int) -> None:
         self._atoms.loc[self._atoms["id"] == uid, "deleted"] = True
-        self.pointUpdate("delete")
+        self.pointUpdate.emit("delete")
         self.sendDataToDataset()
 
-    def undoDeleteAtom(self, uid: int):
+    def undoDeleteAtom(self, uid: int) -> None:
         self._atoms.loc[self._atoms["id"] == uid, "deleted"] = False
         length = self._atoms.loc[self._atoms["deleted"] is False, "atom_number"].shape[0]
         self._atoms.loc[self._atoms["deleted"] is False, "atom_number"] = np.arange(length)
         
         assert self._atoms.loc[self._atoms["id"] == uid, "atom_number"].shape[0] == 1 
-        self.pointUpdate("add", 
+        self.pointUpdate.emit("add", 
                          self._atoms.loc[self._atoms["id"] == uid, "atom_number"].iloc[0],
                          self._atoms.loc[self._atoms["id"] == uid, "atom_instance"].iloc[0])
         self.sendDataToDataset()
 
-    def undoAddBond(self, uid: int):
+    def undoAddBond(self, uid: int) -> None:
         self._bonds.loc[self._bonds["id"] == uid, "deleted"] = True
-        self.lineUpdate("delete")
+        self.lineUpdate.emit("delete")
 
         self.sendDataToDataset()
 
-    def undoDeleteBond(self, uid: int):
+    def undoDeleteBond(self, uid: int) -> None:
         self._bonds.loc[self._bonds["id"] == uid, "deleted"] = False
         length = self._bonds.loc[self._bonds["deleted"] is False, "line_number"].shape[0]
         self._bonds.loc[self._bonds["deleted"] is False, "line_number"] = np.arange(length)
 
         assert self._bonds.loc[self._bonds["id"] == uid, "line_number"].shape[0] == 1 
-        self.lineUpdate("add", 
+        self.lineUpdate.emit("add", 
                         self._bonds.loc[self._bonds["id"] == uid, "line_number"].iloc[0],
                         self._bonds.loc[self._bonds["id"] == uid, "line_instance"].iloc[0])
         
         self.sendDataToDataset()
 
-    def undoDeleteAtomAndBond(self, data: Tuple[int, List[int]]):
+    def undoDeleteAtomAndBond(self, data: Tuple[int, List[int]]) -> None:
         uid_atom, uids_bond = data
         for idx in uid_atom:
             self._atoms.loc[self._atoms["id"] == idx, "deleted"] = False
-            self.pointUpdate("add", self._atoms.loc[self._atoms["id"] == idx, "atom_number"])
+            self.pointUpdate.emit("add", self._atoms.loc[self._atoms["id"] == idx, "atom_number"])
         
         for idx in uids_bond:
             self._bonds.loc[self._bonds["id"] == idx, "deleted"] = False
-            self.lineUpdate("add", self._bonds.loc[self._bonds["id"] == idx, "line_number"])
+            self.lineUpdate.emit("add", self._bonds.loc[self._bonds["id"] == idx, "line_number"])
         
         self.recombineEndpoints()
         self.sendDataToDataset()

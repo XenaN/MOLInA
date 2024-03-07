@@ -25,24 +25,24 @@ class DrawingActionManager:
     def addAction(self, id: Union[List, int], action_type):
         if len(self.action_history) >= self.max_actions:
             self.action_history.pop(0)
-        self.action_history.append({'type': action_type, 'ids': id})
+        self.action_history.append({"type": action_type, "data": id})
 
     def undo(self):
         if self.action_history:
             last_action = self.action_history.pop()
-            action_type = last_action['type']
-            data = last_action['data']
+            action_type = last_action["type"]
+            data = last_action["data"]
 
-            if action_type == 'add_atom':
+            if action_type == "add_atom":
                 # Undo add_point by removing the last point
                 self.widget.undoAddAtom(data)
-            elif action_type == 'delete_atom':
+            elif action_type == "delete_atom":
                 # Undo delete_point by re-adding the point
                 self.widget.undoDeleteAtom(data)
-            elif action_type == 'add_bond':
+            elif action_type == "add_bond":
                 # Undo add_line by removing the last line
                 self.widget.undoAddBond(data)
-            elif action_type == 'delete_bond':
+            elif action_type == "delete_bond":
                 # Undo delete_line by re-adding the line
                 self.widget.undoDeleteBond(data)
             elif action_type == "delete_atom_and_bond":

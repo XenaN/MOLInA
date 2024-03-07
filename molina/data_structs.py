@@ -69,7 +69,7 @@ class Dataset():
     '''Total number of images in dataset'''
     _current_image: str = ''
     '''Index of the current image'''
-    _current_model: str = "MolScribe"
+    current_model: str = "MolScribe"
     '''Current model for prediction atoms and bonds'''
 
     def __post_init__(self) -> None:
@@ -79,7 +79,7 @@ class Dataset():
         self._data_manager.dataUpdateToDataset.connect(self.update_coordinates)
     
     def set_current_model(self, model_name: str) -> None:
-        self._current_model = model_name
+        self.current_model = model_name
 
     def open_image(self, path: str) -> npt.NDArray:
         image = cv2.imread(path, cv2.IMREAD_UNCHANGED) 
@@ -120,6 +120,7 @@ class Dataset():
         for atom in atoms:
             atom['x'] *= self._images[self._current_image].image.shape[1]
             atom['y'] *= self._images[self._current_image].image.shape[0]
+        print(self._images[self._current_image].bonds)
         self._data_manager.sendNewDataToDrawingWidget({"atoms": atoms,
                                                        "bonds": self._images[self._current_image].bonds})
         

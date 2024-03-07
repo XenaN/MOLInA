@@ -21,8 +21,6 @@ from molina.drawing_objects import Atom, TypedLine
     
 
 class DrawingWidget(QWidget):
-    pointUpdate = Signal(object)
-    lineUpdate = Signal(object)
     def __init__(self, parent=None):
         super().__init__(parent)
         self._lines = []
@@ -71,14 +69,14 @@ class DrawingWidget(QWidget):
             self._temp_line.draw(painter)
     
     def addPoint(self, atom: Atom) -> None:
-        not_scaled_atom = Atom(atom.name,
-                               QPoint(atom.position.x() / self._zoom_factor, 
+        not_scaled_atom = Atom(QPoint(atom.position.x() / self._zoom_factor, 
                                       atom.position.y() / self._zoom_factor),
+                               atom.name,
                                atom.size)
         
         self._points.append(atom)
 
-        self.pointUpdate.emit(not_scaled_atom, len(self._points)-1)
+        self._data_manager.addAtom(not_scaled_atom, len(self._points)-1)
         self.update()
     
     def getScaledThresholds(self, threshold: float) -> float:
@@ -102,26 +100,27 @@ class DrawingWidget(QWidget):
         else:
             return
 
-    def addLine(self, line: TypedLine, flag_undo: bool = True) -> None:
+    def addLine(self, line: TypedLine) -> None:
         atoms = self.findAtoms(line.line)
         if atoms:
             p1, p2 = atoms.values()
             line_from_atom = QLine(p1, p2)
-            self._lines.append(line_from_atom)
+            line.line = line_from_atom
+            self._lines.append(line)
 
             not_scaled_line = QLine(line_from_atom.x1() / self._zoom_factor, 
                                     line_from_atom.y1() / self._zoom_factor,
                                     line_from_atom.x2() / self._zoom_factor,
                                     line_from_atom.y2() / self._zoom_factor)
             
-            self.lineUpdate.emit(TypedLine(not_scaled_line, line.type, self._bond_distance),
-                                 list(atoms.keys()), len(self._lines)-1)
+            self._data_manager.addBond(TypedLine(not_scaled_line, line.type, self._bond_distance),
+                         list(atoms.keys()), len(self._lines)-1)
         else: 
             self._temp_line = None
 
         self.update()
     
-    def deleteLine(self, index=-1, flag_undo: bool = True) -> None:
+    def deleteLine(self, index=-1) -> None:
         if index != -1:
             self._lines.pop(index)
             self._data_manager.deleteBond(index, len(self._lines))
@@ -198,14 +197,14 @@ class DrawingWidget(QWidget):
         else:
             raise TypeError()
     
-    def updateDrawScale(self, not_scaled_data) -> None:
+    def updateDrawScale(self) -> None:
+        not_scaled_data = self._data_manager.getDrawingData()
         if len(not_scaled_data["points"]) != 0:
             
             if len(self._lines) == 0 and len(self._points) == 0:
                 self._data_manager.updateDistances(self._text_size, self._bond_distance)
-            
             if len(self._lines) != len(not_scaled_data["lines"]):
-                self._lines = not_scaled_data["lines"]
+                self._lines = [TypedLine(line.line, line.type, line.distance) for line in not_scaled_data["lines"]]
             for i in range(len(not_scaled_data["lines"])):
                 line = not_scaled_data["lines"][i]
                 self._lines[i].line = QLine(
@@ -213,16 +212,14 @@ class DrawingWidget(QWidget):
                     line.line.y1() * self._zoom_factor,
                     line.line.x2() * self._zoom_factor,
                     line.line.y2() * self._zoom_factor)
-                self._lines[i].distance = self._bond_distance
-        
+
             if len(self._points) != len(not_scaled_data["points"]):
-                self._points = not_scaled_data["points"]
+                self._points = [Atom(atom.position, atom.name, atom.size) for atom in not_scaled_data["points"]]
             for i in range(len(not_scaled_data["points"])):
                 point = not_scaled_data["points"][i]
-                self._points[i].position.setX(point.position.x() * self._zoom_factor)
-                self._points[i].position.setY(point.position.y() * self._zoom_factor)
-                self._points[i].size = self._text_size
-            
+                self._points[i].position = QPoint(point.position.x() * self._zoom_factor,
+                                                  point.position.y() * self._zoom_factor)
+
             self.update()
     
     def updatePoint(self, update_type: str, idx: Optional[int] = None, point: Optional[Atom] = None) -> None:
@@ -310,7 +307,7 @@ class DrawingWidget(QWidget):
             self._drawing_point_enabled = False
 
         if event.key() == Qt.Key_Z and event.modifiers() == Qt.ControlModifier:
-            self._action_manager.undo()
+            self._data_manager.undo()
 
         elif event.key() == Qt.Key_C:
             self.setDrawingMode(True, "point", "C")

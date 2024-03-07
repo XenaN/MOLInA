@@ -59,4 +59,7 @@ class Atom:
                           "F": ORGANIC_COLOR}
         
     def color(self):
-        return self.map_atoms[self.name]
+        if self.name in self.map_atoms:
+            return self.map_atoms[self.name]
+        else:
+            return QColor(100, 30, 200)
