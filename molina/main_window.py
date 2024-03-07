@@ -89,7 +89,7 @@ class MainWindow(QMainWindow):
         self.toolbar_main.addWidget(self.button_open)
 
         self.button_save = QPushButton("Save")
-        self.button_save.pressed.connect(self.data_images.save_annotation)
+        self.button_save.pressed.connect(self.data_images.saveAnnotation)
         self.toolbar_main.addWidget(self.button_save)
 
         self.button_left = QToolButton()
@@ -126,7 +126,7 @@ class MainWindow(QMainWindow):
         
         self.toolbar_main.setIconSize(QSize(19, 19))
 
-        self.imagePathSelected.connect(self.data_images.change_current_image)
+        self.imagePathSelected.connect(self.data_images.changeCurrentImage)
           
         self.widget = QWidget()
         self.widget.setLayout(self.page_layout)
@@ -209,7 +209,7 @@ class MainWindow(QMainWindow):
     def onModelCompleted(self, model_result: Dict) -> None:
         if model_result:
             self.changeAnnotation(model_result)
-            self.data_images.draw_annotation()
+            self.data_images.drawAnnotation()
         
         self.file_widget.setEnabled(True)
         self.toolbar_main.setEnabled(True)
@@ -252,6 +252,6 @@ class MainWindow(QMainWindow):
             action.setChecked(action.text() == selected_model_name)
 
     def set_model(self, model_name: str) -> None:
-        self.data_images.set_current_model(model_name)
+        self.data_images.setCurrentModel(model_name)
         self.updateCheckedModel(model_name)
         

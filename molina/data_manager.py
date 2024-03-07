@@ -39,7 +39,7 @@ class DataManager(QObject):
         self._bonds = pd.DataFrame(columns=["id",
                                             "line_number",
                                             "line_instance",
-                                            "type",
+                                            "bond_type",
                                             "endpoint_atoms",
                                             "confidence",
                                             "deleted"])
@@ -73,10 +73,10 @@ class DataManager(QObject):
             atoms_data = filtered_atoms.drop(columns=["id", "atom_instance", "deleted"]).to_dict(orient="records")
 
             filtered_bonds = self._bonds[self._bonds["deleted"] != True]
-            bonds_data = filtered_bonds[["type", "endpoint_atoms", "confidence"]].to_dict(orient="records")
+            bonds_data = filtered_bonds[["bond_type", "endpoint_atoms", "confidence"]].to_dict(orient="records")
 
             self.dataUpdateToDataset.emit({"atoms": atoms_data,
-                                       "bonds": bonds_data})
+                                           "bonds": bonds_data})
     
     # def sendDataToDrawingWidget(self) -> None:
     #     filtered_atoms = self._atoms[self._atoms["deleted"] != True]
@@ -97,10 +97,14 @@ class DataManager(QObject):
         self._atoms["atom_number"] = self._atoms.index
         self._atoms["deleted"] = False
 
+        self._next_atom_id = self._atoms.index[-1]
+
         self._bonds = pd.DataFrame(data["bonds"])
         self._bonds["id"] = self._bonds.index
         self._bonds["line_number"] = self._bonds.index
         self._bonds["deleted"] = False
+
+        self._next_bond_id = self._bonds.index[-1]
 
         lines = []
         for bond in data["bonds"]:
@@ -117,17 +121,17 @@ class DataManager(QObject):
 
         self.newDataToDrawingWidget.emit()
     
-    def addAtom(self, atom: Atom, index: int) -> None:
-        self._atoms.loc[len(self._atoms)] = [
-            self._next_atom_id,
-            index,
-            atom,
-            atom.name,
-            atom.position.x(),
-            atom.position.y(),
-            None,
-            False
-        ]
+    def addAtom(self, atom: Atom, idx: int) -> None:
+        self._atoms = pd.concat([self._atoms, pd.DataFrame({
+            "id": self._next_atom_id,
+            "atom_number": idx,
+            "atom_instance": atom,
+            "atom_symbol": atom.name,
+            "x": atom.position.x(),
+            "y": atom.position.y(),
+            "confidence": None,
+            "deleted": False
+        }, index=[0])], ignore_index=True)
 
         self.sendDataToDataset()
 
@@ -135,16 +139,16 @@ class DataManager(QObject):
 
         self._next_atom_id += 1
     
-    def addBond(self, line: TypedLine, bond_info: List, index: int) -> None:
-        self._bonds.loc[len(self._bonds)] = [
-            self._next_bond_id,
-            index,
-            line,
-            line.type,
-            bond_info,
-            None,
-            False
-        ]
+    def addBond(self, line: TypedLine, bond_info: List, idx: int) -> None:
+        self._bonds = pd.concat([self._bonds, pd.DataFrame({
+            "id": self._next_bond_id,
+            "line_number": idx,
+            "line_instance": line,
+            "bond_type": line.type,
+            "endpoint_atoms": [bond_info],
+            "confidence": None,
+            "deleted": False
+        }, index=[0])], ignore_index=True)   
 
         self.sendDataToDataset()
 
@@ -210,7 +214,7 @@ class DataManager(QObject):
         self._bonds = pd.DataFrame(columns=["id",
                                             "line_number",
                                             "line_instance",
-                                            "type",
+                                            "bond_type",
                                             "endpoint_atoms",
                                             "confidence",
                                             "deleted"])
@@ -227,7 +231,6 @@ class DataManager(QObject):
         self._next_atom_id = 0
 
         self._action_manager = DrawingActionManager(self)
-        # self.sendDataToDataset()
     
     def undo(self) -> None:
         self._action_manager.undo()

@@ -74,18 +74,18 @@ class Dataset():
 
     def __post_init__(self) -> None:
         self._current_image_signal = ImageSignals()
-        self.model_map = {"MolScribe": self.run_molscribe_predict, "another": None}
+        self.model_map = {"MolScribe": self.runMolscribePredict, "another": None}
         self._data_manager = DataManager()
-        self._data_manager.dataUpdateToDataset.connect(self.update_coordinates)
+        self._data_manager.dataUpdateToDataset.connect(self.updateCoordinates)
     
-    def set_current_model(self, model_name: str) -> None:
+    def setCurrentModel(self, model_name: str) -> None:
         self.current_model = model_name
 
-    def open_image(self, path: str) -> npt.NDArray:
+    def openImage(self, path: str) -> npt.NDArray:
         image = cv2.imread(path, cv2.IMREAD_UNCHANGED) 
         return image
     
-    def check_annotation(self, annotation_path: str) -> Optional[Dict]:
+    def checkAnnotation(self, annotation_path: str) -> Optional[Dict]:
         if annotation_path.is_file():
             with open(annotation_path) as f:
                 annotation = json.load(f)
@@ -93,14 +93,14 @@ class Dataset():
         else:
             return
     
-    def run_molscribe_predict(self) -> npt.NDArray:
+    def runMolscribePredict(self) -> npt.NDArray:
         self._images[self._current_image].atoms = []
         self._images[self._current_image].bonds = []
         self._images[self._current_image].run_molscribe()
 
         return self._images[self._current_image]
     
-    def update_coordinates(self, coordinates: Dict) -> None:
+    def updateCoordinates(self, coordinates: Dict) -> None:
         if len(coordinates["atoms"]) != 0:
             for atom in coordinates["atoms"]:
                 atom['x'] /= self._images[self._current_image].image.shape[1]
@@ -115,16 +115,15 @@ class Dataset():
         self._current_image_signal.current_annotation.emit({"atoms": self._images[self._current_image].atoms,
                                                             "bonds": self._images[self._current_image].bonds})
     
-    def draw_annotation(self) -> None:
+    def drawAnnotation(self) -> None:
         atoms = copy.deepcopy(self._images[self._current_image].atoms)
         for atom in atoms:
             atom['x'] *= self._images[self._current_image].image.shape[1]
             atom['y'] *= self._images[self._current_image].image.shape[0]
-        print(self._images[self._current_image].bonds)
         self._data_manager.sendNewDataToDrawingWidget({"atoms": atoms,
                                                        "bonds": self._images[self._current_image].bonds})
         
-    def save_annotation(self) -> None:
+    def saveAnnotation(self) -> None:
         if self._current_image and len(self._images[self._current_image].atoms) != 0:
 
             with open(self._images[self._current_image].path_annotation, 'w', encoding='utf-8') as f:
@@ -133,14 +132,14 @@ class Dataset():
                     "bonds": self._images[self._current_image].bonds
                 }, f, ensure_ascii=False, indent=4)
 
-    def change_current_image(self, path: str) -> None:
+    def changeCurrentImage(self, path: str) -> None:
         '''Changes current image'''
         self._current_image = path
         if path not in self._images:
-            image = self.open_image(path)
+            image = self.openImage(path)
             annotation_path = Path.joinpath(Path(path).parent.resolve(),
                                             Path(path).stem + '.json')
-            annotation = self.check_annotation(annotation_path)
+            annotation = self.checkAnnotation(annotation_path)
             if annotation:
                 self._images[path] = ImageData(path, 
                                               annotation_path,
@@ -160,7 +159,7 @@ class Dataset():
                                                            "bonds": self._images[path].bonds})
 
         if len(self._images[path].atoms) != 0:
-            self.draw_annotation()
+            self.drawAnnotation()
         
         
 class Worker(QObject):
