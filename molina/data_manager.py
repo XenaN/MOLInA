@@ -11,8 +11,8 @@ from molina.action_managers import DrawingActionManager
 class DataManager(QObject):
     dataUpdateToDataset = Signal(object)
     newDataToDrawingWidget = Signal()
-    pointUpdate = Signal(object)
-    lineUpdate = Signal(object)
+    pointUpdate = Signal(str, int, object)
+    lineUpdate = Signal(str, int, object)
     """
     DataManager managers the exchange of information between DrawingWidget and Dataset.
     DrawingWidget needs coordinates, image size, types of bonds and atoms.
@@ -119,6 +119,11 @@ class DataManager(QObject):
 
         self._bonds["line_instance"] = lines
 
+        if "confidence" not in self._atoms.columns:
+            self._atoms["confidence"] = None
+        if "confidence" not in self._bonds.columns:
+            self._bonds["confidence"] = None
+
         self.newDataToDrawingWidget.emit()
     
     def addAtom(self, atom: Atom, idx: int) -> None:
@@ -156,7 +161,7 @@ class DataManager(QObject):
         
         self._next_bond_id += 1
     
-    def pointIsLineEndpoint(point: QPoint, line: QLine) -> bool:
+    def pointIsLineEndpoint(self, point: QPoint, line: QLine) -> bool:
         return line.p1() == point or line.p2() == point
 
     def recombineEndpoints(self) -> None:
@@ -173,23 +178,49 @@ class DataManager(QObject):
     def deleteBond(self, index: int, length: Optional[int] = None):
         uid = self._bonds.loc[self._bonds["line_number"] == index, "id"].to_list()
         self._bonds.loc[self._bonds["line_number"] == index, "deleted"] = True
-        self._bonds.loc[self._bonds["deleted"] is False, "line_number"] = np.arange(length)
+        if self._bonds["deleted"].all() != True:
+            self._bonds.loc[self._bonds["deleted"] == False, "line_number"] = np.arange(length)
 
         self._action_manager.addAction(uid, "delete_bond")
+
+        self.recombineEndpoints()
+
+        self.sendDataToDataset()
     
     def deleteAtom(self, index: int, length: Optional[int] = None):
         uid = self._atoms.loc[self._atoms["atom_number"] == index, "id"].to_list()
 
         self._atoms.loc[self._atoms["atom_number"] == index, "deleted"] = True
-        self._atoms.loc[self._atoms["deleted"] is False, "atom_number"] = np.arange(length)
+        if self._atoms["deleted"].all() != True:
+            self._atoms.loc[self._atoms["deleted"] == False, "atom_number"] = np.arange(length)
     
         if self._bonds.shape[0] != 0:
-            uids_bond = self._bonds.loc[self._bonds['endpoint_atoms'].apply(lambda endpoints: index in endpoints), "id"].to_list()
-            self._bonds.loc[self._bonds['endpoint_atoms'].apply(lambda endpoints: index in endpoints), 'deleted'] = True
+
+            uids_bond = self._bonds.loc[self._bonds['endpoint_atoms'].apply(
+                lambda endpoints: index in endpoints), "id"].to_list()
+
+            self._bonds.loc[self._bonds['endpoint_atoms'].apply(
+                lambda endpoints: index in endpoints), 'deleted'] = True
+
             self.recombineEndpoints()
+
+            if self._bonds["deleted"].all() != True:
+                length_bond = self._bonds.loc[self._bonds["deleted"] == False].shape[0]
+                self._bonds.loc[self._bonds["deleted"] == False, 
+                                "line_number"] = np.arange(length_bond)
+
             self._action_manager.addAction((uid, uids_bond), "delete_atom_and_bond")
+
+            line_idxs = self._bonds.loc[self._bonds["id"].isin(uids_bond), "line_number"].to_list()
+            line_idxs.reverse()
+            if len(line_idxs) != 0:
+                for i in line_idxs:
+                    self.lineUpdate.emit("delete", i, None)
+        
         else:
             self._action_manager.addAction(uid, "delete_atom")
+
+        self.sendDataToDataset()
 
     def updateDistances(self, text_size: int, bond_distance: float) -> None:
         for idx in self._atoms.index:
@@ -202,13 +233,15 @@ class DataManager(QObject):
         return self.prepareDataToDrawingWidget()
     
     def allDeleted(self) -> Tuple[List]:
-        uids_atoms = self._atoms.loc[self._atoms["deleted"] is False, "id"].to_list()
+        uids_atoms = self._atoms.loc[self._atoms["deleted"] == False, "id"].to_list()
         self._atoms["deleted"] = True
         
-        uids_bonds = self._bonds.loc[self._bonds["deleted"] is False, "id"].to_list()
+        uids_bonds = self._bonds.loc[self._bonds["deleted"] == False, "id"].to_list()
         self._bonds["deleted"] = True
 
         self._action_manager.addAction((uids_atoms, uids_bonds), "delete_atom_and_bond")
+
+        self.sendDataToDataset()
     
     def cleanAll(self) -> None:
         self._bonds = pd.DataFrame(columns=["id",
@@ -242,8 +275,8 @@ class DataManager(QObject):
 
     def undoDeleteAtom(self, uid: int) -> None:
         self._atoms.loc[self._atoms["id"] == uid, "deleted"] = False
-        length = self._atoms.loc[self._atoms["deleted"] is False, "atom_number"].shape[0]
-        self._atoms.loc[self._atoms["deleted"] is False, "atom_number"] = np.arange(length)
+        length = self._atoms.loc[self._atoms["deleted"] == False, "atom_number"].shape[0]
+        self._atoms.loc[self._atoms["deleted"] == False, "atom_number"] = np.arange(length)
         
         assert self._atoms.loc[self._atoms["id"] == uid, "atom_number"].shape[0] == 1 
         self.pointUpdate.emit("add", 
@@ -259,8 +292,8 @@ class DataManager(QObject):
 
     def undoDeleteBond(self, uid: int) -> None:
         self._bonds.loc[self._bonds["id"] == uid, "deleted"] = False
-        length = self._bonds.loc[self._bonds["deleted"] is False, "line_number"].shape[0]
-        self._bonds.loc[self._bonds["deleted"] is False, "line_number"] = np.arange(length)
+        length = self._bonds.loc[self._bonds["deleted"] == False, "line_number"].shape[0]
+        self._bonds.loc[self._bonds["deleted"] == False, "line_number"] = np.arange(length)
 
         assert self._bonds.loc[self._bonds["id"] == uid, "line_number"].shape[0] == 1 
         self.lineUpdate.emit("add", 

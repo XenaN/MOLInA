@@ -120,19 +120,15 @@ class DrawingWidget(QWidget):
 
         self.update()
     
-    def deleteLine(self, index=-1) -> None:
-        if index != -1:
-            self._lines.pop(index)
-            self._data_manager.deleteBond(index, len(self._lines))
-        else:
-            self._lines.pop()
-            self._data_manager.deleteBond(index)
+    def deleteLine(self, idx: int) -> None:
+        self._lines.pop(idx)
+        self._data_manager.deleteBond(idx, len(self._lines))
 
         self.update()
                 
-    def deletePointAndLine(self, index: int) -> None:
-        self._points.pop(index)
-        self._data_manager.deleteAtom(index, len(self._points))
+    def deletePointAndLine(self, idx: int) -> None:
+        self._points.pop(idx)
+        self._data_manager.deleteAtom(idx, len(self._points))
 
         self.update()
 
@@ -223,8 +219,10 @@ class DrawingWidget(QWidget):
             self.update()
     
     def updatePoint(self, update_type: str, idx: Optional[int] = None, point: Optional[Atom] = None) -> None:
-        if update_type == "delete":
+        if update_type == "delete" and idx is None:
             self._points.pop()
+        elif update_type == "delete" and idx is not None:
+            self._points.pop(idx)
         elif update_type == "add":
             point.position = QPoint(point.position.x * self._zoom_factor,
                                     point.position.y * self._zoom_factor)
@@ -233,8 +231,10 @@ class DrawingWidget(QWidget):
         self.update()
 
     def updateLine(self, update_type: str, idx: Optional[int] = None, line: Optional[TypedLine] = None) -> None:
-        if update_type == "delete":
+        if update_type == "delete" and idx is None:
             self._lines.pop()
+        elif update_type == "delete" and idx is not None:
+            self._lines.pop(idx)
         elif update_type == "add":
             line.line = QLine(line.line.x1 * self._zoom_factor,
                               line.line.y1 * self._zoom_factor,
