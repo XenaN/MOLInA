@@ -175,7 +175,7 @@ class MainWindow(QMainWindow):
             annotation_pretty = annotation_pretty + str(key) + ':\n' 
             for item in annotation[key]:
                 for internal_key, internal_value in item.items(): 
-                    if internal_key == "confidence" and internal_value is None:
+                    if internal_key == "confidence" and internal_value == "not_modeling":
                         continue
                     annotation_pretty = annotation_pretty + tab + str(internal_key) + ': ' + str(internal_value) + '\n'
                 annotation_pretty += '\n'
@@ -209,7 +209,6 @@ class MainWindow(QMainWindow):
     def onModelCompleted(self, model_result: Dict) -> None:
         if model_result:
             self.changeAnnotation(model_result)
-            self.data_images.drawAnnotation()
         
         self.file_widget.setEnabled(True)
         self.toolbar_main.setEnabled(True)

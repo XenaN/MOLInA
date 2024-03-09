@@ -37,7 +37,7 @@ class DrawingWidget(QWidget):
         self._data_manager = DataManager()
         self.setFocusPolicy(Qt.StrongFocus)     
 
-        self._data_manager.newDataToDrawingWidget.connect(self.updateDrawScale)
+        self._data_manager.newDataToDrawingWidget.connect(self.drawNewData)
         self._data_manager.pointUpdate.connect(self.updatePoint)
         self._data_manager.lineUpdate.connect(self.updateLine)
 
@@ -195,12 +195,12 @@ class DrawingWidget(QWidget):
     
     def updateDrawScale(self) -> None:
         not_scaled_data = self._data_manager.getDrawingData()
+
         if len(not_scaled_data["points"]) != 0:
             
-            if len(self._lines) == 0 and len(self._points) == 0:
-                self._data_manager.updateDistances(self._text_size, self._bond_distance)
             if len(self._lines) != len(not_scaled_data["lines"]):
                 self._lines = [TypedLine(line.line, line.type, line.distance) for line in not_scaled_data["lines"]]
+            
             for i in range(len(not_scaled_data["lines"])):
                 line = not_scaled_data["lines"][i]
                 self._lines[i].line = QLine(
@@ -209,14 +209,20 @@ class DrawingWidget(QWidget):
                     line.line.x2() * self._zoom_factor,
                     line.line.y2() * self._zoom_factor)
 
+            
             if len(self._points) != len(not_scaled_data["points"]):
                 self._points = [Atom(atom.position, atom.name, atom.size) for atom in not_scaled_data["points"]]
+            
             for i in range(len(not_scaled_data["points"])):
                 point = not_scaled_data["points"][i]
                 self._points[i].position = QPoint(point.position.x() * self._zoom_factor,
                                                   point.position.y() * self._zoom_factor)
-
+                                                  
             self.update()
+    
+    def drawNewData(self):
+        self._data_manager.updateDistances(self._text_size, self._bond_distance)
+        self.updateDrawScale()
     
     def updatePoint(self, update_type: str, idx: Optional[int] = None, point: Optional[Atom] = None) -> None:
         if update_type == "delete" and idx is None:

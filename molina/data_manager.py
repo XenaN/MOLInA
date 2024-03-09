@@ -77,16 +77,6 @@ class DataManager(QObject):
 
             self.dataUpdateToDataset.emit({"atoms": atoms_data,
                                            "bonds": bonds_data})
-    
-    # def sendDataToDrawingWidget(self) -> None:
-    #     filtered_atoms = self._atoms[self._atoms["deleted"] != True]
-    #     atoms_data = filtered_atoms["atom_instance"].to_list()
-
-    #     filtered_bonds = self._bonds[self._bonds["deleted"] != True]
-    #     bonds_data = filtered_bonds["line_instance"].to_list()
-
-    #     self.dataUpdateToDrawingWidget.emit({"atoms": atoms_data,
-    #                                          "bonds": bonds_data})
             
     def sendNewDataToDrawingWidget(self, data: Dict[str, Dict]) -> None:
         self._atoms = pd.DataFrame(data["atoms"])
@@ -120,23 +110,27 @@ class DataManager(QObject):
         self._bonds["line_instance"] = lines
 
         if "confidence" not in self._atoms.columns:
-            self._atoms["confidence"] = None
+            self._atoms["confidence"] = "not_modeling"
         if "confidence" not in self._bonds.columns:
-            self._bonds["confidence"] = None
+            self._bonds["confidence"] = "not_modeling"
 
         self.newDataToDrawingWidget.emit()
     
     def addAtom(self, atom: Atom, idx: int) -> None:
-        self._atoms = pd.concat([self._atoms, pd.DataFrame({
+        new_data = pd.DataFrame({
             "id": self._next_atom_id,
             "atom_number": idx,
             "atom_instance": atom,
             "atom_symbol": atom.name,
             "x": atom.position.x(),
             "y": atom.position.y(),
-            "confidence": None,
+            "confidence": "not_modeling",
             "deleted": False
-        }, index=[0])], ignore_index=True)
+        }, index=[0])
+        if self._atoms.empty:
+            self._atoms = new_data.copy()
+        else:
+            self._atoms = pd.concat([self._atoms, new_data], ignore_index=True)
 
         self.sendDataToDataset()
 
@@ -145,15 +139,20 @@ class DataManager(QObject):
         self._next_atom_id += 1
     
     def addBond(self, line: TypedLine, bond_info: List, idx: int) -> None:
-        self._bonds = pd.concat([self._bonds, pd.DataFrame({
+        new_data = pd.DataFrame({
             "id": self._next_bond_id,
             "line_number": idx,
             "line_instance": line,
             "bond_type": line.type,
             "endpoint_atoms": [bond_info],
-            "confidence": None,
+            "confidence": "not_modeling",
             "deleted": False
-        }, index=[0])], ignore_index=True)   
+        }, index=[0])
+
+        if self._bonds.empty:
+            self._bonds = new_data.copy()
+        else:
+            self._bonds = pd.concat([self._bonds, new_data], ignore_index=True)   
 
         self.sendDataToDataset()
 

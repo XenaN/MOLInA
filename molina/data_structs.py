@@ -93,6 +93,10 @@ class Dataset():
         else:
             return
     
+    def countAtoms(self) -> None:
+        for i, atom in enumerate(self._images[self._current_image].atoms):
+            atom["atom_number"] = i
+    
     def runMolscribePredict(self) -> npt.NDArray:
         self._images[self._current_image].atoms = []
         self._images[self._current_image].bonds = []
@@ -120,6 +124,7 @@ class Dataset():
         for atom in atoms:
             atom['x'] *= self._images[self._current_image].image.shape[1]
             atom['y'] *= self._images[self._current_image].image.shape[0]
+
         self._data_manager.sendNewDataToDrawingWidget({"atoms": atoms,
                                                        "bonds": self._images[self._current_image].bonds})
         
@@ -146,6 +151,7 @@ class Dataset():
                                               image,
                                               annotation["atoms"], 
                                               annotation["bonds"])
+                self.countAtoms()
             else:
                 self._images[path] = ImageData(path,
                                               annotation_path,
@@ -172,11 +178,13 @@ class Worker(QObject):
 
     def run(self):
         result = self.data.model_map[self.data.current_model]()
-
+        self.data.countAtoms()
         self.result.emit(
             {"atoms": result.atoms, 
              "bonds": result.bonds})
         self.finished.emit()
+
+        self.data.drawAnnotation()
 
 
 
