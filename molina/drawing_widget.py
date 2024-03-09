@@ -224,9 +224,9 @@ class DrawingWidget(QWidget):
         elif update_type == "delete" and idx is not None:
             self._points.pop(idx)
         elif update_type == "add":
-            point.position = QPoint(point.position.x * self._zoom_factor,
-                                    point.position.y * self._zoom_factor)
-            self._points.insert(idx, point)
+            scaled_point = QPoint(point.position.x() * self._zoom_factor,
+                                  point.position.y() * self._zoom_factor)
+            self._points.insert(idx, Atom(scaled_point, point.name, point.size))
         
         self.update()
 
@@ -236,11 +236,12 @@ class DrawingWidget(QWidget):
         elif update_type == "delete" and idx is not None:
             self._lines.pop(idx)
         elif update_type == "add":
-            line.line = QLine(line.line.x1 * self._zoom_factor,
-                              line.line.y1 * self._zoom_factor,
-                              line.line.x2 * self._zoom_factor,
-                              line.line.y2 * self._zoom_factor)
-            self._lines.insert(idx, line)
+            new_line = QLine(line.line.x1() * self._zoom_factor,
+                             line.line.y1() * self._zoom_factor,
+                             line.line.x2() * self._zoom_factor,
+                             line.line.y2() * self._zoom_factor)
+            
+            self._lines.insert(idx, TypedLine(new_line, line.type, line.distance))
         
         self.update()
     
@@ -289,8 +290,9 @@ class DrawingWidget(QWidget):
     
     def mouseMoveEvent(self, event) -> None:
         if self._drawing_line_enabled:
-            self._temp_line.line.setP2(event.pos())
-            self.update()
+            if self._temp_line:
+                self._temp_line.line.setP2(event.pos())
+                self.update()
     
     def mouseReleaseEvent(self, event) -> None:
         if event.button() == Qt.LeftButton and self._drawing_line_enabled:
