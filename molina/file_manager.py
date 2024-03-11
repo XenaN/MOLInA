@@ -16,6 +16,11 @@ from PySide6.QtWidgets import (
 
 
 class FileManager(QWidget):
+    """ This class shows directories and images inside ones. 
+    One click opens directory.
+    Double click on image opens image in CentralWidget.
+    It doesn't work when model predicts atoms and bonds for opened image.
+    """
     itemSelected = Signal(str)
     def __init__(self, parent: QWidget) -> None:
         super(FileManager, self).__init__(parent)
@@ -43,6 +48,7 @@ class FileManager(QWidget):
         self.file_view.doubleClicked.connect(self.onDoubleClicked)
     
     def onClicked(self, index: QModelIndex) -> None:
+        """ Open/close directory """
         path = self.file_model.filePath(index)
         if QFileInfo(path).isDir():
             if self.file_view.isExpanded(index):
@@ -51,6 +57,7 @@ class FileManager(QWidget):
                 self.file_view.expand(index)
 
     def onDoubleClicked(self, index: QModelIndex) -> None:
+        """ Send image path to MainWindow """
         path = self.sender().model().filePath(index)
         if QFile(path).exists() and not QFileInfo(path).isDir():
             if path.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.bmp')):

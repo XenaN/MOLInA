@@ -43,21 +43,24 @@ COLOR_BACKGROUND_WIDGETS = QColor(250, 250, 250)
 
 
 class MainWindow(QMainWindow):
+    """ Main Window class contains three parts: File Manager, Drawing Widget and Text Representation.
+    It has toolbar with open, save, left, right, recent, current model, clean all and predict buttons.
+    Also it will have Help button for describing hot keys abilities. 
+    """
     imagePathSelected = Signal(str)
     def __init__(self) -> None:
         super(MainWindow, self).__init__()
 
         self.setWindowTitle("MOLInA")
 
-        self.data_images = Dataset(_images = {})
-
-        self.data_images._current_image_signal.current_image.connect(self.changeImage)
-        self.data_images._current_image_signal.current_annotation.connect(self.changeAnnotation)
-
         self.page_layout = QHBoxLayout()
         self.splitter =  QSplitter(self)
         self.toolbar_main = QToolBar()
         self.fileAction = FileActionManager()
+        
+        self.data_images = Dataset({})
+        self.data_images._current_image_signal.current_image.connect(self.changeImage)
+        self.data_images._current_image_signal.current_annotation.connect(self.changeAnnotation)
         
         self.central_widget = CentralWidget()
         self.setColor(self.central_widget, COLOR_BACKGROUND_WIDGETS)
@@ -65,12 +68,8 @@ class MainWindow(QMainWindow):
         self.file_widget = FileManager(self)
         self.file_widget.itemSelected.connect(self.changeCurrentImage)
 
-        self.splitter.addWidget(self.file_widget)
-
         self.addToolBar(self.toolbar_main)
         self.page_layout.addWidget(self.splitter)
-
-        self.splitter.addWidget(self.central_widget)
 
         self.text_widget = QTextEdit(self.splitter)
         self.text_widget.setMinimumSize(200, 200)
@@ -78,6 +77,8 @@ class MainWindow(QMainWindow):
         self.text_widget.setLineWrapMode(QTextEdit.WidgetWidth)
         self.text_widget.setReadOnly(True)
 
+        self.splitter.addWidget(self.file_widget)
+        self.splitter.addWidget(self.central_widget)
         self.splitter.addWidget(self.text_widget)
 
         self.splitter.setStretchFactor(0, 1)
@@ -86,42 +87,43 @@ class MainWindow(QMainWindow):
 
         self.button_open = QPushButton("Open")
         self.button_open.pressed.connect(self.openImage)
-        self.toolbar_main.addWidget(self.button_open)
 
         self.button_save = QPushButton("Save")
         self.button_save.pressed.connect(self.data_images.saveAnnotation)
-        self.toolbar_main.addWidget(self.button_save)
 
         self.button_left = QToolButton()
         self.button_left.setIcon(QIcon(RESOURCES_PATH.filePath("left_button.png")))
-        self.toolbar_main.addWidget(self.button_left)
-
+        
         self.button_right = QToolButton()
         self.button_right.setIcon(QIcon(RESOURCES_PATH.filePath("right_button.png")))
-        self.toolbar_main.addWidget(self.button_right)
 
         self.recent_menu = QMenu()
         self.button_recent = QToolButton()
         self.button_recent.setIcon(QIcon(RESOURCES_PATH.filePath("recent.png")))
         self.button_recent.setMenu(self.recent_menu)
         self.button_recent.pressed.connect(self.showRecent)
-        self.toolbar_main.addWidget(self.button_recent)
-
+        
         self.button_clean = QToolButton()
         self.button_clean.setIcon(QIcon(RESOURCES_PATH.filePath("eraser.png")))
         self.button_clean.pressed.connect(self.central_widget.drawing_widget.clearAll)
-        self.toolbar_main.addWidget(self.button_clean)
-
+        
         self.model_menu = QMenu()
         self.button_current_model = QPushButton("Current Model")
         self.button_current_model.setMenu(self.model_menu)
-        self.toolbar_main.addWidget(self.button_current_model)
 
         self.model_menu_items = ["MolScribe", "another"]
         self.setModelMenu()
 
         self.button_predict = QPushButton("Predict")
         self.button_predict.pressed.connect(self.startPrediction)
+        
+        self.toolbar_main.addWidget(self.button_open)
+        self.toolbar_main.addWidget(self.button_save)
+        self.toolbar_main.addWidget(self.button_left)
+        self.toolbar_main.addWidget(self.button_right)
+        self.toolbar_main.addWidget(self.button_recent)
+        self.toolbar_main.addWidget(self.button_clean)
+        self.toolbar_main.addWidget(self.button_current_model)       
         self.toolbar_main.addWidget(self.button_predict)
         
         self.toolbar_main.setIconSize(QSize(19, 19))
@@ -134,6 +136,7 @@ class MainWindow(QMainWindow):
         self.showMaximized()
 
     def changeImage(self, image: npt.NDArray) -> None:
+        """ Convert numpy array to QPixmap """
         self.central_widget.setScaleFactor(1.0)
         
         if image.ndim == 3:  
@@ -155,6 +158,7 @@ class MainWindow(QMainWindow):
         self.central_widget.setCentralPixmap(QPixmap.fromImage(q_image))
 
     def openImage(self) -> None:
+        """ Open image with file dialog window """
         options = QFileDialog.Options()
         options |= QFileDialog.ReadOnly
         file_dialog = QFileDialog(self, options=options)
@@ -165,10 +169,12 @@ class MainWindow(QMainWindow):
             self.changeCurrentImage(selected_file)
         
     def changeCurrentImage(self, path: str) -> None:
+        """Add image to file action and change current image in Dataset"""
         self.fileAction.addRecentImage(path)
         self.imagePathSelected.emit(path)
     
     def changeAnnotation(self, annotation: Dict[str, List[Any]]) -> None:
+        """ Make text more pretty look and set it into text area """
         annotation_pretty = ''
         tab = '        '
         for key in annotation.keys():
@@ -188,12 +194,15 @@ class MainWindow(QMainWindow):
         scrollbar.setValue(current_pos)
 
     def startPrediction(self) -> None:
+        """ Start new thread to parallel prediction 
+        Block FileManager and toolbar """
         if not self.central_widget.hasPixmap():
             QMessageBox.warning(self, "Prediction Error", "No image to predict.")
             return
         
         self.file_widget.setEnabled(False)
         self.toolbar_main.setEnabled(False)
+
         self.thread = QThread()
         self.worker = Worker(self.data_images)
         self.worker.moveToThread(self.thread)
@@ -207,6 +216,7 @@ class MainWindow(QMainWindow):
         self.thread.start()
 
     def onModelCompleted(self, model_result: Dict) -> None:
+        """ Unblock FileManager and toolbar and change annotation text """
         if model_result:
             self.changeAnnotation(model_result)
         
@@ -214,21 +224,20 @@ class MainWindow(QMainWindow):
         self.toolbar_main.setEnabled(True)
     
     def resizeEvent(self, event: QPaintEvent) -> None:
+        """ Save central widget size as image size while 
+        main window or central part of main window is changed 
+        """
         self.central_widget.setPixmapSize()   
 
-    def addPointToDataManager(self, point: Dict, index: int) -> None:
-        self.data_manager.addAtom(point)
-    
-    def addLineToDataManager(self, line: TypedLine, endpoint: List, index: int) -> None:
-        self.data_manager.addBond(line, endpoint)
-
     def setColor(self, widget: QWidget, color: QColor) -> None:
+        """ Fill widget background by one color """
         widget.setAutoFillBackground(True)
         palette = widget.palette()
         palette.setColor(QPalette.Window, color)
         widget.setPalette(palette)
     
     def showRecent(self) -> None:
+        """ Show recent opened images """
         self.recent_menu.clear()
         for file_path in self.fileAction.getRecentImages():
             action = self.recent_menu.addAction(file_path)
@@ -237,20 +246,19 @@ class MainWindow(QMainWindow):
         menu_pos = self.button_recent.parentWidget().mapToGlobal(self.button_recent.geometry().bottomLeft())
         self.recent_menu.popup(menu_pos)
     
+    def setModel(self, model_name: str) -> None:
+        """ Change current model according to user click """
+        self.data_images.setCurrentModel(model_name)
+        
+        for action in self.model_menu.actions():
+            action.setChecked(action.text() == model_name)
+        
     def setModelMenu(self) -> None:
+        """ Fill menu of models by existing models """
         for item in self.model_menu_items:
             action = QAction(item, self)
             action.setCheckable(True)
-            action.triggered[bool].connect(lambda _, name=item: self.set_model(name))
+            action.triggered[bool].connect(lambda _, name=item: self.setModel(name))
             self.model_menu.addAction(action)
 
         self.model_menu.actions()[0].setChecked(True)
-    
-    def updateCheckedModel(self, selected_model_name: str) -> None:
-        for action in self.model_menu.actions():
-            action.setChecked(action.text() == selected_model_name)
-
-    def set_model(self, model_name: str) -> None:
-        self.data_images.setCurrentModel(model_name)
-        self.updateCheckedModel(model_name)
-        

@@ -24,14 +24,20 @@ COLOR_BACKGROUND_WIDGETS = QColor(250, 250, 250)
 
 
 class CentralWidget(QWidget):
+    """
+    Widget between File Manager and Annotation text.
+    It contains zoom buttons, an image representation and a drawing area.
+    """
     def __init__(self, parent=None):
         super().__init__(parent)
+        # Relation between image size, and widget size, then it changes depending on zooming
         self._scale_factor = 1
         self._pixmap = QPixmap()
 
         self.central_widget_layout = QVBoxLayout()
         self.setLayout(self.central_widget_layout)
 
+        # Area for zoom buttons
         self.toolbar_zoom = QToolBar()
 
         self.button_zoom_in = QToolButton()
@@ -46,6 +52,7 @@ class CentralWidget(QWidget):
 
         self.central_widget_layout.addWidget(self.toolbar_zoom)
 
+        # Layout for drawing over image, also it is a reason of a lot of containers
         self.image_layout = QStackedLayout()
         self.image_layout.setStackingMode(QStackedLayout.StackingMode.StackAll)
         self.image_layout.setContentsMargins(0, 0, 0, 0)
@@ -69,6 +76,7 @@ class CentralWidget(QWidget):
         self.image_layout.addWidget(self.image_widget)
         self.setColor(self.image_widget, COLOR_BACKGROUND_WIDGETS)
 
+        # When image zooms bigger than image widget
         self.scrollArea = QScrollArea()
         self.scrollArea.setWidgetResizable(True)
         self.scrollArea.setWidget(self.image_container)
@@ -78,24 +86,29 @@ class CentralWidget(QWidget):
         self.central_widget_layout.addWidget(self.scrollArea)
     
     def hasPixmap(self) -> bool:
+        """ Check Pixmap existing """
         if self._pixmap.isNull():
             return False
         else:
             return True
 
     def setScaleFactor(self, factor: float) -> None:
+        """ Set new scale factor and zoom factor to drawing widget """
         self._scale_factor = factor
         self.drawing_widget.setZoomFactor(self._scale_factor)
 
     def zoomIn(self) -> None:
-      self._scale_factor *= 1.1
-      self.resizeImage()
+        """ Increase image """
+        self._scale_factor *= 1.1
+        self.resizeImage()
       
     def zoomOut(self) -> None:
-      self._scale_factor /= 1.1
-      self.resizeImage()
+        """ Decrease image """
+        self._scale_factor /= 1.1
+        self.resizeImage()
     
     def resizeImage(self) -> None:
+        """ Change image representation size with saving original image size """
         if not self._pixmap.isNull():
             scaled_pixmap = self._pixmap.scaled(self._scale_factor * self._pixmap.size(), Qt.KeepAspectRatio)
             
@@ -103,16 +116,20 @@ class CentralWidget(QWidget):
             self.image_widget.setMinimumSize(scaled_pixmap.size())
             
             self.drawing_widget.setZoomFactor(self._scale_factor)
+
+            # Drawing widget size strongly relates to scaled image size
             self.drawing_widget.setFixedSize(scaled_pixmap.size())
             self.drawing_widget.updateDrawScale()
     
     def setPixmapSize(self) -> None: 
+        """ Save image widget size when main window resizes """
         if not self._pixmap.isNull():
             self.image_widget.setPixmap(self._pixmap.scaled(
                 self._scale_factor * self._pixmap.size(),
                 Qt.KeepAspectRatio))
         
     def fitImage(self) -> QPixmap:
+        """ When image opens at first time it should fit to image widget size """
         if self._pixmap.height() >= self._pixmap.width():
             scaled_pixmap = self._pixmap.scaledToHeight(self.image_widget.height())
             # if picture is still out of boundaries
@@ -128,6 +145,7 @@ class CentralWidget(QWidget):
         return scaled_pixmap
     
     def setCentralPixmap(self, image: QPixmap) -> None:
+        """ Changes sizes, factors and clean drawing area when new image is opened """
         self._pixmap = image
         if not self._pixmap.isNull():
             original_size = self._pixmap.height() + self._pixmap.width()
@@ -139,6 +157,7 @@ class CentralWidget(QWidget):
             self.setScaleFactor((scaled_pixmap.height() + scaled_pixmap.width()) / original_size)
 
     def setColor(self, widget: QWidget, color: QColor) -> None:
+        """ Set background widget color """
         widget.setAutoFillBackground(True)
         palette = widget.palette()
         palette.setColor(QPalette.Window, color)

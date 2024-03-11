@@ -1,10 +1,22 @@
 from typing import Union, List
 
 class FileActionManager:
+    """
+    A class used to track recently open image files
+
+    recent_images: list 
+        list of image paths
+    """
     def __init__(self):
         self.recent_images = []
     
     def addRecentImage(self, image_path: str):
+        """ 
+        adding recent images and remove the oldest image 
+        if recent_images is bigger than 10
+
+        :param image_path: path to chosen image
+        """
         if image_path in self.recent_images:
             self.recent_images.remove(image_path)
 
@@ -14,37 +26,61 @@ class FileActionManager:
             self.recent_images.pop()
 
     def getRecentImages(self) -> List:
+        """get list of image paths
+        
+        :return: list of image path
+        """
         return self.recent_images
 
 class DrawingActionManager:
+    """
+    This class saves a sequence of operations in the drawing widget for using 
+    ctrl+z combination to cancel the last (several) action
+
+    widget: DrawingWidget
+            class for drawing
+    action_history: list 
+            list of operations (add, delete, clean)
+    max_actions: int
+            maximum of actions which contain action_history
+    """
     def __init__(self, widget):
         self.widget = widget
         self.action_history = []
         self.max_actions = 15
 
-    def addAction(self, id: Union[List, int], action_type):
+    def addAction(self, id: Union[List, int], action_type: str):
+        """ add a new action to action_history and remove the oldest action
+        if action_history is bigger than max_actions
+
+        :param id: list of unique indexes or one unique index
+        :param action_type: type of action
+        """
         if len(self.action_history) >= self.max_actions:
             self.action_history.pop(0)
         self.action_history.append({"type": action_type, "data": id})
 
     def undo(self):
+        """ call undo function due to last action """
+
         if self.action_history:
             last_action = self.action_history.pop()
             action_type = last_action["type"]
             data = last_action["data"]
 
             if action_type == "add_atom":
-                # Undo add_point by removing the last point
+                # Undo add point by removing the last point
                 self.widget.undoAddAtom(data)
             elif action_type == "delete_atom":
-                # Undo delete_point by re-adding the point
+                # Undo delete point by re-adding the point
                 self.widget.undoDeleteAtom(data)
             elif action_type == "add_bond":
-                # Undo add_line by removing the last line
+                # Undo add line by removing the last line
                 self.widget.undoAddBond(data)
             elif action_type == "delete_bond":
-                # Undo delete_line by re-adding the line
+                # Undo delete line by re-adding the line
                 self.widget.undoDeleteBond(data)
             elif action_type == "delete_atom_and_bond":
+                # Undo delete point and lines by re-adding the point and lines
                 self.widget.undoDeleteAtomAndBond(data)
 

@@ -10,12 +10,21 @@ ORGANIC_COLOR = QColor(0, 150, 0)
 
 
 class TypedLine:
+    """ This class is line for DrawingWidget which contains information about:
+    line: QLine
+        line position
+    type: str
+        type of line (single, double, triple and etc.)
+    distance: float
+        some distance for drawing related lines 
+    """
     def __init__(self, line: QLine, type_line: str, distance: float):
         self.line = line
         self.type = type_line
         self.distance = distance
     
     def calculateParallelLines(self) -> Tuple[float]:
+        """ Calculate deltas to make lines parallel in different rotation """
         # Calculate the direction vector of the line
         dx = self.line.x2() - self.line.x1()
         dy = self.line.y2() - self.line.y1()
@@ -30,6 +39,7 @@ class TypedLine:
             return -uy, ux
 
     def draw(self, painter: QPainter):
+        """ Drawing line according to its type """
         if self.type == "single":
             painter.drawLine(self.line)
 
@@ -49,6 +59,16 @@ class TypedLine:
 
 
 class Atom:
+    """ This class is point (or Atom) for DrawingWidget which contains information about:
+    position: QPoint
+        point position
+    name: str
+        atom symbol
+    size: int
+        font size
+    map_atoms: Dict[str, QColor]
+        mapping color and symbol
+    """
     def __init__(self, position: QPoint, name: str, size: int) -> None:
         self.position = position
         self.name = name
@@ -59,6 +79,7 @@ class Atom:
                           "F": ORGANIC_COLOR}
         
     def color(self):
+        """ Return color according to map_atoms"""
         if self.name in self.map_atoms:
             return self.map_atoms[self.name]
         else:
