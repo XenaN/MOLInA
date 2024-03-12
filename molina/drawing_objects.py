@@ -2,7 +2,7 @@ import math
 
 from typing import Tuple
 
-from PySide6.QtGui import QColor, QPainter
+from PySide6.QtGui import QColor, QPainter, QPen, QFont
 from PySide6.QtCore import QPoint, QLine
 
 
@@ -18,7 +18,7 @@ class TypedLine:
     distance: float
         some distance for drawing related lines 
     """
-    def __init__(self, line: QLine, type_line: str, distance: float):
+    def __init__(self, line: QLine, type_line: str, distance: float) -> None:
         self.line = line
         self.type = type_line
         self.distance = distance
@@ -38,7 +38,7 @@ class TypedLine:
 
             return -uy, ux
 
-    def draw(self, painter: QPainter):
+    def draw(self, painter: QPainter) -> None:
         """ Drawing line according to its type """
         if self.type == "single":
             painter.drawLine(self.line)
@@ -78,9 +78,37 @@ class Atom:
                           "O": ORGANIC_COLOR,
                           "F": ORGANIC_COLOR}
         
-    def color(self):
+    def color(self) -> None:
         """ Return color according to map_atoms"""
         if self.name in self.map_atoms:
             return self.map_atoms[self.name]
         else:
             return QColor(100, 30, 200)
+    
+    def draw(self, painter: QPainter, flag: bool = False) -> None:
+        """ Draw text """
+        pen = QPen(self.color(), 5)
+        painter.setPen(pen)
+
+        font_size = self.size
+        font = QFont("Verdana", font_size)
+        painter.setFont(font)
+
+        font_metrics = painter.fontMetrics()
+        text_width = font_metrics.boundingRect(self.name).width()
+        text_height = font_metrics.boundingRect(self.name).height()
+        text_position = QPoint(self.position.x() - text_width // 2, 
+                               self.position.y() - text_height // 2 + font_metrics.ascent())
+
+        painter.drawText(text_position, self.name)
+
+        if flag:
+            # Draw rectangle where temporal text will be written
+            rect_width = max(text_width + 2, font_metrics.horizontalAdvance("M") + 2)  # Adding some padding
+            rect_height = max(text_height + 2, font_metrics.height() + 2)
+
+            rect_x = self.position.x() - rect_width // 2
+            rect_y = self.position.y() - rect_height // 2
+
+            painter.setPen(QPen(QColor(0, 0, 255)))  # Blue rectangle
+            painter.drawRect(rect_x + 2, rect_y + 2, rect_width, rect_height)

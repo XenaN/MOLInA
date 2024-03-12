@@ -12,7 +12,7 @@ from PySide6.QtGui import (
     QPainter,
     QPen,
     QPaintEvent,
-    QFont,
+    QColor,
 )
 
 from molina.data_manager import DataManager
@@ -30,10 +30,12 @@ class DrawingWidget(QWidget):
         super().__init__(parent)
         self._lines = []
         self._points = []
+        self._temp_text = ""
         
         self._temp_line = None
         self._atom_type = None
         self._bond_type = None
+        self._temp_atom = None
         
         self._zoom_factor = 1.0
         
@@ -43,6 +45,7 @@ class DrawingWidget(QWidget):
         
         self._drawing_line_enabled = False
         self._drawing_point_enabled = False
+        self._is_writing = False
         
         self.setFocusPolicy(Qt.StrongFocus)     
 
@@ -54,28 +57,22 @@ class DrawingWidget(QWidget):
     def paintEvent(self, event: QPaintEvent) -> None:
         """ Function to draw points and lines """
         painter = QPainter(self)
+        pen = QPen(Qt.red, 5)
+        painter.setPen(pen)
+
         for line in self._lines:
             line.distance = self.getScaledThresholds(self._bond_distance)
-            pen = QPen(Qt.red, 5)
-            painter.setPen(pen)
             line.draw(painter)
 
         for point in self._points:
-            pen = QPen(point.color(), 5)
-            painter.setPen(pen)
+            point.size = int(self.getScaledThresholds(self._text_size))
+            point.draw(painter)
 
-            font_size = int(self.getScaledThresholds(point.size))
-            font = QFont("Verdana", font_size)
-            painter.setFont(font)
-
-            font_metrics = painter.fontMetrics()
-            text_width = font_metrics.boundingRect(point.name).width()
-            text_height = font_metrics.boundingRect(point.name).height()
-            text_position = QPoint(point.position.x() - text_width // 2, 
-                                   point.position.y() - text_height // 2 + font_metrics.ascent())
-
-            painter.drawText(text_position, point.name)
-
+        # Draw current text being written
+        if self._temp_atom:
+            self._temp_atom.size = int(self.getScaledThresholds(self._text_size))
+            self._temp_atom.draw(painter, self._is_writing)
+                
         if self._temp_line:
             pen = QPen(Qt.red, 5)
             painter.setPen(pen)
@@ -306,11 +303,13 @@ class DrawingWidget(QWidget):
         """ Reset all variables after image changing """
         self._lines = []
         self._points = []
+        self._temp_text = ""
         self._temp_line = None
         self._zoom_factor = 1.0
         self._text_size = None
         self._bond_distance = None
         self._closest_atom_threshold = None
+        self._is_writing = False
         self._drawing_line_enabled = False
         self._drawing_point_enabled = False
 
@@ -336,6 +335,11 @@ class DrawingWidget(QWidget):
                 self._temp_line = TypedLine(QLine(event.pos(), event.pos()),
                                             self._bond_type, 
                                             self.getScaledThresholds(self._bond_distance))
+            
+            elif self._is_writing:
+                self._temp_atom = Atom(event.pos(), "", self._text_size)
+                self._temp_text = ""
+                self.update()
                 
         elif event.button() == Qt.RightButton:
             self.findClosestObject(event.pos())
@@ -363,8 +367,27 @@ class DrawingWidget(QWidget):
             self._drawing_line_enabled = False
         elif self._drawing_point_enabled:
             self._drawing_point_enabled = False
-
-        if event.key() == Qt.Key_Z and event.modifiers() == Qt.ControlModifier:
+        
+        if self._is_writing:
+            if event.key() == Qt.Key_Return:
+                if self._temp_atom and self._temp_text != "":
+                    self._temp_atom.name = self._temp_text
+                    self.addPoint(self._temp_atom)
+                self._is_writing = False
+                self._temp_text = ""
+                self._temp_atom = None
+            
+            elif event.key() == Qt.Key_Backspace:
+                self._temp_text = self._temp_text[:-1]
+                self._temp_atom.name = self._temp_text
+            
+            else:
+                self._temp_text += event.text()
+                self._temp_atom.name = self._temp_text
+            
+            self.update()
+        
+        elif event.key() == Qt.Key_Z and event.modifiers() == Qt.ControlModifier:
             self._data_manager.undo()
 
         elif event.key() == Qt.Key_C:
@@ -381,3 +404,10 @@ class DrawingWidget(QWidget):
 
         elif event.key() == Qt.Key_3:
             self.setDrawingMode(True, "line", "triple")
+        
+        elif event.key() == Qt.Key_W:
+            self._is_writing = not self._is_writing
+            self._temp_atom = None
+            self.update()
+        
+        
