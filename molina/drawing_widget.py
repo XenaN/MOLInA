@@ -72,7 +72,7 @@ class DrawingWidget(QWidget):
             text_width = font_metrics.boundingRect(point.name).width()
             text_height = font_metrics.boundingRect(point.name).height()
             text_position = QPoint(point.position.x() - text_width // 2, 
-                                   point.position.y() + text_height // 2)
+                                   point.position.y() - text_height // 2 + font_metrics.ascent())
 
             painter.drawText(text_position, point.name)
 
