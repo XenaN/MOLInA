@@ -45,16 +45,18 @@ class TypedLine:
 
         elif self.type == "double":
             px, py = self.calculateParallelLines()
-            painter.drawLine(QLine(self.line.x1() + self.distance * px, self.line.y1() + self.distance * py, 
-                                   self.line.x2() + self.distance * px, self.line.y2() + self.distance * py))
-            painter.drawLine(QLine(self.line.x1() - self.distance * px, self.line.y1() - self.distance * py, 
-                                   self.line.x2() - self.distance * px, self.line.y2() - self.distance * py))
+            if px: 
+                painter.drawLine(QLine(self.line.x1() + self.distance * px, self.line.y1() + self.distance * py, 
+                                    self.line.x2() + self.distance * px, self.line.y2() + self.distance * py))
+                painter.drawLine(QLine(self.line.x1() - self.distance * px, self.line.y1() - self.distance * py, 
+                                    self.line.x2() - self.distance * px, self.line.y2() - self.distance * py))
         elif self.type == "triple":
             px, py = self.calculateParallelLines()
-            painter.drawLine(self.line)
-            painter.drawLine(QLine(self.line.x1() + self.distance * px, self.line.y1() + self.distance * py, 
-                                   self.line.x2() + self.distance * px, self.line.y2() + self.distance * py))
-            painter.drawLine(QLine(self.line.x1() - self.distance * px, self.line.y1() - self.distance * py, 
+            if px: 
+                painter.drawLine(self.line)
+                painter.drawLine(QLine(self.line.x1() + self.distance * px, self.line.y1() + self.distance * py, 
+                                    self.line.x2() + self.distance * px, self.line.y2() + self.distance * py))
+                painter.drawLine(QLine(self.line.x1() - self.distance * px, self.line.y1() - self.distance * py, 
                                    self.line.x2() - self.distance * px, self.line.y2() - self.distance * py))
 
 

@@ -396,6 +396,51 @@ class DrawingWidget(QWidget):
         elif event.key() == Qt.Key_N:
             self.setDrawingMode(True, "point", "N")
         
+        elif event.key() == Qt.Key_O:
+            self.setDrawingMode(True, "point", "O")
+        
+        elif event.key() == Qt.Key_I:
+            self.setDrawingMode(True, "point", "I")
+        
+        elif event.key() == Qt.Key_S:
+            self.setDrawingMode(True, "point", "S")
+        
+        elif event.key() == Qt.Key_F:
+            self.setDrawingMode(True, "point", "F")
+        
+        elif event.key() == Qt.Key_K:
+            self.setDrawingMode(True, "point", "K")
+
+        elif event.key() == Qt.Key_L:
+            self.setDrawingMode(True, "point", "Li")
+
+        elif event.key() == Qt.Key_R:
+            self.setDrawingMode(True, "point", "Ru")
+        
+        elif event.key() == Qt.Key_Y:
+            self.setDrawingMode(True, "point", "Y")
+
+        elif event.key() == Qt.Key_P:
+            self.setDrawingMode(True, "point", "P")
+        
+        elif event.key() == Qt.Key_A:
+            self.setDrawingMode(True, "point", "Al")
+        
+        elif event.key() == Qt.Key_G:
+            self.setDrawingMode(True, "point", "Ga")
+
+        elif event.key() == Qt.Key_Z:
+            self.setDrawingMode(True, "point", "Zn")
+
+        elif event.key() == Qt.Key_V:
+            self.setDrawingMode(True, "point", "V")
+        
+        elif event.key() == Qt.Key_B:
+            self.setDrawingMode(True, "point", "B")
+        
+        elif event.key() == Qt.Key_M:
+            self.setDrawingMode(True, "point", "Mn")
+
         elif event.key() == Qt.Key_1:
             self.setDrawingMode(True, "line", "single")
         
