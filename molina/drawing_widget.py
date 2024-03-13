@@ -57,10 +57,12 @@ class DrawingWidget(QWidget):
     def paintEvent(self, event: QPaintEvent) -> None:
         """ Function to draw points and lines """
         painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        
         pen = QPen(Qt.red, 5)
-        painter.setPen(pen)
 
         for line in self._lines:
+            painter.setPen(pen)
             line.distance = self.getScaledThresholds(self._bond_distance)
             line.draw(painter)
 
@@ -70,11 +72,11 @@ class DrawingWidget(QWidget):
 
         # Draw current text being written
         if self._temp_atom:
+            painter.setPen(pen)
             self._temp_atom.size = int(self.getScaledThresholds(self._text_size))
             self._temp_atom.draw(painter, self._is_writing)
                 
         if self._temp_line:
-            pen = QPen(Qt.red, 5)
             painter.setPen(pen)
             self._temp_line.draw(painter)
     
@@ -99,18 +101,23 @@ class DrawingWidget(QWidget):
         """ Save temporal line only if there are near two points """
         threshold = self.getScaledThresholds(self._closest_atom_threshold)
 
-        close_point = {}
+        # Keep order founded atoms
+        close_point = {"start": [], "end": []}
+
         for i, atom in enumerate(self._points):
             point = atom.position
             distance_to_start = (line.p1() - point).manhattanLength()
             distance_to_end = (line.p2() - point).manhattanLength()
             
             if distance_to_start <= threshold:
-                close_point[i] = point
+                close_point["start"].append({"pos": point, 
+                                             "idx": i})
             elif distance_to_end <= threshold:
-                close_point[i] = point
+                close_point["end"].append({"pos": point, 
+                                             "idx": i})
         
-        if len(close_point) == 2: 
+        # Check how many atoms are founded, if two - ok
+        if (len(close_point["start"]) + len(close_point["end"])) == 2: 
             return close_point
         else:
             return
@@ -119,7 +126,7 @@ class DrawingWidget(QWidget):
         """ Add bond to DataManager data """
         atoms = self.findAtoms(line.line)
         if atoms:
-            p1, p2 = atoms.values()
+            p1, p2 = atoms["start"][0]["pos"], atoms["end"][0]["pos"]
             line_from_atom = QLine(p1, p2)
             line.line = line_from_atom
             self._lines.append(line)
@@ -132,7 +139,8 @@ class DrawingWidget(QWidget):
             self._data_manager.addBond(TypedLine(not_scaled_line, 
                                                  line.type, 
                                                  self._bond_distance),
-                         list(atoms.keys()), len(self._lines)-1)
+                                       [atoms["start"][0]["idx"], atoms["end"][0]["idx"]], 
+                                       len(self._lines)-1)
         else: 
             self._temp_line = None
 
@@ -389,6 +397,11 @@ class DrawingWidget(QWidget):
         
         elif event.key() == Qt.Key_Z and event.modifiers() == Qt.ControlModifier:
             self._data_manager.undo()
+        
+        elif event.key() == Qt.Key_W:
+            self._is_writing = not self._is_writing
+            self._temp_atom = None
+            self.update()
 
         elif event.key() == Qt.Key_C:
             self.setDrawingMode(True, "point", "C")
@@ -449,10 +462,17 @@ class DrawingWidget(QWidget):
 
         elif event.key() == Qt.Key_3:
             self.setDrawingMode(True, "line", "triple")
+
+        elif event.key() == Qt.Key_4:
+            self.setDrawingMode(True, "line", "aromatic")
         
-        elif event.key() == Qt.Key_W:
-            self._is_writing = not self._is_writing
-            self._temp_atom = None
-            self.update()
+        elif event.key() == Qt.Key_5:
+            self.setDrawingMode(True, "line", "up")
+        
+        elif event.key() == Qt.Key_6:
+            self.setDrawingMode(True, "line", "wide")
+        
+        elif event.key() == Qt.Key_7:
+            self.setDrawingMode(True, "line", "down")
         
         
