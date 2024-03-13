@@ -40,7 +40,7 @@ class DrawingWidget(QWidget):
         self._zoom_factor = 1.0
         
         self._text_size = None
-        self._bond_distance = None
+        self._bond_constant = None
         self._closest_atom_threshold = None
         
         self._drawing_line_enabled = False
@@ -60,24 +60,23 @@ class DrawingWidget(QWidget):
         painter.setRenderHint(QPainter.Antialiasing)
         
         pen = QPen(Qt.red, 5)
+        painter.setPen(pen)
 
         for line in self._lines:
-            painter.setPen(pen)
-            line.distance = self.getScaledThresholds(self._bond_distance)
+            line.constants = self.getScaledBondConstants(self._bond_constant)
             line.draw(painter)
 
         for point in self._points:
-            point.size = int(self.getScaledThresholds(self._text_size))
+            point.size = int(self.getScaledConstants(self._text_size))
             point.draw(painter)
 
         # Draw current text being written
         if self._temp_atom:
-            painter.setPen(pen)
-            self._temp_atom.size = int(self.getScaledThresholds(self._text_size))
+            self._temp_atom.size = int(self.getScaledConstants(self._text_size))
             self._temp_atom.draw(painter, self._is_writing)
-                
+
+        # Draw current line while button mouse is pushed       
         if self._temp_line:
-            painter.setPen(pen)
             self._temp_line.draw(painter)
     
     def addPoint(self, atom: Atom) -> None:
@@ -92,14 +91,22 @@ class DrawingWidget(QWidget):
         self._data_manager.addAtom(not_scaled_atom, len(self._points)-1)
         self.update()
     
-    def getScaledThresholds(self, threshold: float) -> float:
-        """ Scaled thresholds or distances, or return maximum or minimum value """
+    def getScaledConstants(self, threshold: float) -> float:
+        """ Scaled thresholds or sizes, or return maximum or minimum value """
         value = threshold * self._zoom_factor
         return 1 if value < 1 else 100 if value > 100 else value
+    
+    def getScaledBondConstants(self, bond_constants: float) -> float:
+        """ Scaled thresholds or distances, or return maximum or minimum value """
+        min_value = 1
+        max_value = 20
+        scaled_dict = {key: min(max(int(value  * self._zoom_factor), min_value), max_value) 
+                       for key, value in bond_constants.items()}
+        return scaled_dict
 
     def findAtoms(self, line: QLine) -> Dict:
         """ Save temporal line only if there are near two points """
-        threshold = self.getScaledThresholds(self._closest_atom_threshold)
+        threshold = self.getScaledConstants(self._closest_atom_threshold)
 
         # Keep order founded atoms
         close_point = {"start": [], "end": []}
@@ -138,7 +145,7 @@ class DrawingWidget(QWidget):
             
             self._data_manager.addBond(TypedLine(not_scaled_line, 
                                                  line.type, 
-                                                 self._bond_distance),
+                                                 self._bond_constant),
                                        [atoms["start"][0]["idx"], atoms["end"][0]["idx"]], 
                                        len(self._lines)-1)
         else: 
@@ -189,7 +196,7 @@ class DrawingWidget(QWidget):
         """ Check if click is on tolerance rectangle of chosen line """
         tolerance_rect = self.createToleranceRectangle(start, 
                                                        end, 
-                                                       self.getScaledThresholds(self._bond_distance))
+                                                       self.getScaledBondConstants(self._bond_constant))
         if tolerance_rect:
             return tolerance_rect.contains(point)
         
@@ -201,7 +208,7 @@ class DrawingWidget(QWidget):
 
     def findClosestObject(self, position: QPoint) -> None:
         """ According to scaled threshold choose the closest object and delete it """
-        threshold = self.getScaledThresholds(self._closest_atom_threshold)
+        threshold = self.getScaledConstants(self._closest_atom_threshold)
         
         for i in range(len(self._points)):
             distance = (position - self._points[i].position).manhattanLength()
@@ -245,7 +252,7 @@ class DrawingWidget(QWidget):
             
             if len(not_scaled_data["lines"]) != 0:
                 if len(self._lines) != len(not_scaled_data["lines"]):
-                    self._lines = [TypedLine(line.line, line.type, line.distance) for line in not_scaled_data["lines"]]
+                    self._lines = [TypedLine(line.line, line.type, line.constants) for line in not_scaled_data["lines"]]
                 
                 for i in range(len(not_scaled_data["lines"])):
                     line = not_scaled_data["lines"][i]
@@ -261,7 +268,7 @@ class DrawingWidget(QWidget):
         """ Set not scaled distances and font size to DataManager data
           and scale data to draw it 
         """
-        self._data_manager.updateDistances(self._text_size, self._bond_distance)
+        self._data_manager.updateDistances(self._text_size, self._bond_constant)
         self.updateDrawScale()
     
     def updatePoint(self, update_type: str, idx: Optional[int] = None, point: Optional[Atom] = None) -> None:
@@ -290,17 +297,20 @@ class DrawingWidget(QWidget):
                              line.line.x2() * self._zoom_factor,
                              line.line.y2() * self._zoom_factor)
             
-            self._lines.insert(idx, TypedLine(new_line, line.type, line.distance))
+            self._lines.insert(idx, TypedLine(new_line, line.type, line.constants))
         
         self.update()
     
-    def setThresholds(self, image_size: QSize) -> None:
+    def setConstants(self, image_size: QSize) -> None:
         """ Choose smallest image side and scale all constants """
         smallest_dim = min(image_size.width(), image_size.height())
 
-        self._bond_distance = smallest_dim * 0.02
+        self._bond_constant = {"bond_distance": 14, 
+                               "line_width": 8,
+                               "max_width": 12,
+                               "segment_number": 20}
         self._closest_atom_threshold = smallest_dim * 0.03
-        self._text_size  = smallest_dim * 0.06
+        self._text_size = 45
 
     def setZoomFactor(self, factor: float) -> None:
         """ Set new zoom factor after scale factor changing """
@@ -315,7 +325,7 @@ class DrawingWidget(QWidget):
         self._temp_line = None
         self._zoom_factor = 1.0
         self._text_size = None
-        self._bond_distance = None
+        self._bond_constant = None
         self._closest_atom_threshold = None
         self._is_writing = False
         self._drawing_line_enabled = False
@@ -342,7 +352,7 @@ class DrawingWidget(QWidget):
             elif self._drawing_line_enabled:
                 self._temp_line = TypedLine(QLine(event.pos(), event.pos()),
                                             self._bond_type, 
-                                            self.getScaledThresholds(self._bond_distance))
+                                            self.getScaledBondConstants(self._bond_constant))
             
             elif self._is_writing:
                 self._temp_atom = Atom(event.pos(), "", self._text_size)
@@ -362,7 +372,7 @@ class DrawingWidget(QWidget):
     def mouseReleaseEvent(self, event) -> None:
         """ Add line if two atoms are nearby """
         if event.button() == Qt.LeftButton and self._drawing_line_enabled:
-            self._temp_line.distance = self._bond_distance
+            self._temp_line.constants = self._bond_constant
             self.addLine(self._temp_line)
             self._temp_line = None
 

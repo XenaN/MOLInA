@@ -1,12 +1,13 @@
 import math
 
-from typing import Tuple
+from typing import Tuple, Dict, Union
 
 from PySide6.QtGui import QColor, QPainter, QPen, QFont
 from PySide6.QtCore import QPoint, QLine, Qt
 
 
 ORGANIC_COLOR = QColor(0, 150, 0)
+PASTEL_RED = QColor(255, 70, 70)
 
 
 class TypedLine:
@@ -18,10 +19,10 @@ class TypedLine:
     distance: float
         some distance for drawing related lines 
     """
-    def __init__(self, line: QLine, type_line: str, distance: float) -> None:
+    def __init__(self, line: QLine, type_line: str, constants: Dict[str, int]) -> None:
         self.line = line
         self.type = type_line
-        self.distance = distance
+        self.constants = constants
     
     def calculateParallelLines(self) -> Tuple[float]:
         """ Calculate deltas to make lines parallel in different rotation """
@@ -43,39 +44,54 @@ class TypedLine:
 
     def draw(self, painter: QPainter) -> None:
         """ Drawing line according to its type """
+        pen = QPen(PASTEL_RED, self.constants["line_width"])
+        painter.setPen(pen)
+        
         if self.type == "single":
             painter.drawLine(self.line)
 
         elif self.type == "double":
             px, py = self.calculateParallelLines()
             if px: 
-                painter.drawLine(QLine(self.line.x1() + self.distance * px, self.line.y1() + self.distance * py, 
-                                    self.line.x2() + self.distance * px, self.line.y2() + self.distance * py))
-                painter.drawLine(QLine(self.line.x1() - self.distance * px, self.line.y1() - self.distance * py, 
-                                    self.line.x2() - self.distance * px, self.line.y2() - self.distance * py))
+                painter.drawLine(QLine(self.line.x1() + self.constants["bond_distance"] * px, 
+                                       self.line.y1() + self.constants["bond_distance"] * py, 
+                                       self.line.x2() + self.constants["bond_distance"] * px, 
+                                       self.line.y2() + self.constants["bond_distance"] * py))
+                painter.drawLine(QLine(self.line.x1() - self.constants["bond_distance"] * px, 
+                                       self.line.y1() - self.constants["bond_distance"] * py, 
+                                       self.line.x2() - self.constants["bond_distance"] * px, 
+                                       self.line.y2() - self.constants["bond_distance"] * py))
         elif self.type == "triple":
             px, py = self.calculateParallelLines()
             if px: 
                 painter.drawLine(self.line)
-                painter.drawLine(QLine(self.line.x1() + self.distance * px, self.line.y1() + self.distance * py, 
-                                    self.line.x2() + self.distance * px, self.line.y2() + self.distance * py))
-                painter.drawLine(QLine(self.line.x1() - self.distance * px, self.line.y1() - self.distance * py, 
-                                   self.line.x2() - self.distance * px, self.line.y2() - self.distance * py))
+                painter.drawLine(QLine(self.line.x1() + self.constants["bond_distance"] * px, 
+                                       self.line.y1() + self.constants["bond_distance"] * py, 
+                                       self.line.x2() + self.constants["bond_distance"] * px, 
+                                       self.line.y2() + self.constants["bond_distance"] * py))
+                painter.drawLine(QLine(self.line.x1() - self.constants["bond_distance"] * px, 
+                                       self.line.y1() - self.constants["bond_distance"] * py, 
+                                       self.line.x2() - self.constants["bond_distance"] * px, 
+                                       self.line.y2() - self.constants["bond_distance"] * py))
         
         elif self.type == "aromatic":
             px, py = self.calculateParallelLines()
             if px:
-                painter.drawLine(QLine(self.line.x1() - self.distance * px, self.line.y1() - self.distance * py, 
-                                    self.line.x2() - self.distance * px, self.line.y2() - self.distance * py))
-                dotted_line = QLine(self.line.x1() + self.distance * px, self.line.y1() + self.distance * py, 
-                                    self.line.x2() + self.distance * px, self.line.y2() + self.distance * py)
+                painter.drawLine(QLine(self.line.x1() - self.constants["bond_distance"] * px, 
+                                       self.line.y1() - self.constants["bond_distance"] * py, 
+                                       self.line.x2() - self.constants["bond_distance"] * px, 
+                                       self.line.y2() - self.constants["bond_distance"] * py))
+                dotted_line = QLine(self.line.x1() + self.constants["bond_distance"] * px, 
+                                    self.line.y1() + self.constants["bond_distance"] * py, 
+                                    self.line.x2() + self.constants["bond_distance"] * px, 
+                                    self.line.y2() + self.constants["bond_distance"] * py)
                 
-                dotted_pen = QPen(Qt.red, 5, Qt.DotLine)
+                dotted_pen = QPen(PASTEL_RED, self.constants["line_width"], Qt.DotLine)
                 painter.setPen(dotted_pen)
                 painter.drawLine(dotted_line)
         
         elif self.type == "wide":
-            pen = QPen(Qt.red, 10)
+            pen = QPen(PASTEL_RED, int(self.constants["line_width"] * 1.5))
             painter.setPen(pen)
             painter.drawLine(self.line)
         
@@ -88,7 +104,7 @@ class TypedLine:
             dx = end_point.x() - start_point.x()
             dy = end_point.y() - start_point.y()
 
-            max_pen_width = 10 
+            max_pen_width = self.constants["max_width"] 
             min_pen_width = 1  
 
             for i in range(num_segments):
@@ -101,21 +117,22 @@ class TypedLine:
                                     start_point.y() + fraction_end * dy)
 
                 pen_width = min_pen_width + (max_pen_width - min_pen_width) * (i / num_segments)
-                pen = QPen(Qt.red, pen_width)
+                pen = QPen(PASTEL_RED, pen_width)
                 painter.setPen(pen)
 
                 # Draw the segment
                 painter.drawLine(segment_start, segment_end)
         
         elif self.type == "down":
-            pen = QPen(Qt.red, 4)
+            pen = QPen(PASTEL_RED, int(self.constants["line_width"] * 0.8))
             painter.setPen(pen)
+            
             start_point = self.line.p1()
             end_point = self.line.p2()
 
             min_length = 1
-            max_length = 10
-            num_lines = 20
+            max_length = self.constants["max_width"]
+            num_lines = self.constants["segment_number"]
 
             # Calculate the direction of the main line
             dx = end_point.x() - start_point.x()
@@ -175,6 +192,7 @@ class Atom:
 
         font_size = self.size
         font = QFont("Verdana", font_size)
+        font.setBold(True)
         painter.setFont(font)
 
         font_metrics = painter.fontMetrics()

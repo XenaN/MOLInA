@@ -227,6 +227,7 @@ class MainWindow(QMainWindow):
         """ Save central widget size as image size while 
         main window or central part of main window is changed 
         """
+        super().resizeEvent(event)
         self.central_widget.setPixmapSize()   
 
     def setColor(self, widget: QWidget, color: QColor) -> None:

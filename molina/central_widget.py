@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QStackedLayout,
     QWidget,
     QScrollArea,
+    QSizePolicy
 )
 from PySide6.QtGui import (
     QPalette, 
@@ -111,7 +112,7 @@ class CentralWidget(QWidget):
         """ Change image representation size with saving original image size """
         if not self._pixmap.isNull():
             scaled_pixmap = self._pixmap.scaled(self._scale_factor * self._pixmap.size(), Qt.KeepAspectRatio)
-            
+
             self.image_widget.setPixmap(scaled_pixmap)
             self.image_widget.setMinimumSize(scaled_pixmap.size())
             
@@ -148,13 +149,33 @@ class CentralWidget(QWidget):
         """ Changes sizes, factors and clean drawing area when new image is opened """
         self._pixmap = image
         if not self._pixmap.isNull():
+            
+            # To return image_widget size after zooming to usual size save policy
+            sp = self.image_widget.sizePolicy()
+
+            # Set scrollArea.size without scrollbar width
+            if self.scrollArea.horizontalScrollBar().isVisible():
+                scrollAreaHeight = self.scrollArea.height() - self.scrollArea.horizontalScrollBar().height()
+                scrollAreaWidth = self.scrollArea.width() - self.scrollArea.verticalScrollBar().width()
+            else:
+                scrollAreaHeight = self.image_widget.height()
+                scrollAreaWidth = self.image_widget.width()
+
+            self.image_widget.setFixedSize(scrollAreaWidth, scrollAreaHeight)
+
+            # Change pixmap size as image_widget size
             original_size = self._pixmap.height() + self._pixmap.width()
             scaled_pixmap = self.fitImage()
+            
+            # Return old policy
+            self.image_widget.setMaximumSize(2000, 2000)
+            self.image_widget.setSizePolicy(sp)
 
             self.drawing_widget.setFixedSize(scaled_pixmap.size())
             self.drawing_widget.cleanDrawingWidget()
-            self.drawing_widget.setThresholds(self._pixmap.size())
+
             self.setScaleFactor((scaled_pixmap.height() + scaled_pixmap.width()) / original_size)
+            self.drawing_widget.setConstants(self._pixmap.size())
 
     def setColor(self, widget: QWidget, color: QColor) -> None:
         """ Set background widget color """
