@@ -35,7 +35,7 @@ from molina.central_widget import CentralWidget
 from molina.drawing_widget import TypedLine
 from molina.action_managers import FileActionManager
 from molina.file_manager import FileManager
-from molina.data_manager import DataManager
+from molina.help_widget import HelpWindow
 
 
 RESOURCES_PATH = QDir("molina/resources")
@@ -116,6 +116,10 @@ class MainWindow(QMainWindow):
 
         self.button_predict = QPushButton("Predict")
         self.button_predict.pressed.connect(self.startPrediction)
+
+        self.help_button = QPushButton("Help")
+        self.help_button.clicked.connect(self.showHelpWindow)
+
         
         self.toolbar_main.addWidget(self.button_open)
         self.toolbar_main.addWidget(self.button_save)
@@ -125,6 +129,7 @@ class MainWindow(QMainWindow):
         self.toolbar_main.addWidget(self.button_clean)
         self.toolbar_main.addWidget(self.button_current_model)       
         self.toolbar_main.addWidget(self.button_predict)
+        self.toolbar_main.addWidget(self.help_button)
         
         self.toolbar_main.setIconSize(QSize(19, 19))
 
@@ -134,6 +139,10 @@ class MainWindow(QMainWindow):
         self.widget.setLayout(self.page_layout)
         self.setCentralWidget(self.widget)
         self.showMaximized()
+
+    def showHelpWindow(self):
+        help_window = HelpWindow()
+        help_window.exec_()
 
     def changeImage(self, image: npt.NDArray) -> None:
         """ Convert numpy array to QPixmap """
