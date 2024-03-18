@@ -90,12 +90,12 @@ class TypedLine:
                 painter.setPen(dotted_pen)
                 painter.drawLine(dotted_line)
         
-        elif self.type == "wide":
+        elif self.type == "solid unwedge":
             pen = QPen(PASTEL_RED, int(self.constants["line_width"] * 1.5))
             painter.setPen(pen)
             painter.drawLine(self.line)
         
-        elif self.type == "up":
+        elif self.type == "solid wedge":
             start_point = self.line.p1()
             end_point = self.line.p2()
 
@@ -123,7 +123,7 @@ class TypedLine:
                 # Draw the segment
                 painter.drawLine(segment_start, segment_end)
         
-        elif self.type == "down":
+        elif self.type == "dashed wedge":
             pen = QPen(PASTEL_RED, int(self.constants["line_width"] * 0.8))
             painter.setPen(pen)
             

@@ -477,12 +477,12 @@ class DrawingWidget(QWidget):
             self.setDrawingMode(True, "line", "aromatic")
         
         elif event.key() == Qt.Key_5:
-            self.setDrawingMode(True, "line", "up")
+            self.setDrawingMode(True, "line", "solid wedge")
         
         elif event.key() == Qt.Key_6:
-            self.setDrawingMode(True, "line", "wide")
+            self.setDrawingMode(True, "line", "solid unwedge")
         
         elif event.key() == Qt.Key_7:
-            self.setDrawingMode(True, "line", "down")
+            self.setDrawingMode(True, "line", "dashed wedge")
         
         
