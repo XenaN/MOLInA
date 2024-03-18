@@ -5,6 +5,8 @@ from PySide6.QtCore import Qt, Signal, QObject
 
 class Hotkeys(QObject):
     """
+    Class for saving information about hotkeys. 
+    It returns actual values and changes some values if user rewrite it in HelpWindow
     """
     mapUpdate = Signal(dict)
     _instance = None
@@ -45,8 +47,10 @@ class Hotkeys(QObject):
                           "7": ("line", "dashed wedge"),}
     
     def getHotkeys(self) -> Dict:
+        """ Return hotkeys"""
         return self._map_keys.copy()
     
     def setNewValue(self, key, value) -> None:
+        """ Change value for key """
         self._map_keys[key] = (self._map_keys[key][0], value)
         self.mapUpdate.emit(self._map_keys.copy())

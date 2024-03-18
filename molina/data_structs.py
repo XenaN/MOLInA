@@ -75,7 +75,7 @@ class Dataset():
     current_model: str = "MolScribe"
     """ Current model for prediction atoms and bonds """
 
-    def __post_init__(self) -> None:
+    def __post_init__(self):
         self._current_image_signal = ImageSignals()
         self.model_map = {"MolScribe": self.runMolscribePredict, "another": None}
         self._data_manager = DataManager()

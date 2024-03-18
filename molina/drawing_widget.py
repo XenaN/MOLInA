@@ -424,8 +424,13 @@ class DrawingWidget(QWidget):
             self._temp_atom = None
             self.update()
 
-        elif self._map_keys[chr(event.key())]:
-            type_action, name = self._map_keys[chr(event.key())][0], self._map_keys[chr(event.key())][1]
-            self.setDrawingMode(True, type_action, name)
+        else:
+            key = event.key()
+            try:
+                if self._map_keys[chr(event.key())]:
+                    type_action, name = self._map_keys[chr(event.key())][0], self._map_keys[chr(event.key())][1]
+                    self.setDrawingMode(True, type_action, name)
+            except (ValueError, KeyError):
+                pass
         
         

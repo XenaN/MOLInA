@@ -22,7 +22,7 @@ class FileManager(QWidget):
     It doesn't work when model predicts atoms and bonds for opened image.
     """
     itemSelected = Signal(str)
-    def __init__(self, parent: QWidget) -> None:
+    def __init__(self, parent: QWidget):
         super(FileManager, self).__init__(parent)
         self.file_layout = QVBoxLayout(self)
         self.file_view = QTreeView(self)

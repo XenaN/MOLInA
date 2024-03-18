@@ -19,7 +19,7 @@ class TypedLine:
     distance: float
         some distance for drawing related lines 
     """
-    def __init__(self, line: QLine, type_line: str, constants: Dict[str, int]) -> None:
+    def __init__(self, line: QLine, type_line: str, constants: Dict[str, int]):
         self.line = line
         self.type = type_line
         self.constants = constants
@@ -169,7 +169,7 @@ class Atom:
     map_atoms: Dict[str, QColor]
         mapping color and symbol
     """
-    def __init__(self, position: QPoint, name: str, size: int) -> None:
+    def __init__(self, position: QPoint, name: str, size: int):
         self.position = position
         self.name = name
         self.size = size

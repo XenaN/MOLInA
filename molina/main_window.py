@@ -48,7 +48,7 @@ class MainWindow(QMainWindow):
     Also it will have Help button for describing hot keys abilities. 
     """
     imagePathSelected = Signal(str)
-    def __init__(self) -> None:
+    def __init__(self):
         super(MainWindow, self).__init__()
 
         self.setWindowTitle("MOLInA")

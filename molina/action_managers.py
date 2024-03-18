@@ -10,7 +10,7 @@ class FileActionManager:
     def __init__(self):
         self.recent_images = []
     
-    def addRecentImage(self, image_path: str):
+    def addRecentImage(self, image_path: str) -> None:
         """ 
         adding recent images and remove the oldest image 
         if recent_images is bigger than 10
@@ -49,7 +49,7 @@ class DrawingActionManager:
         self.action_history = []
         self.max_actions = 15
 
-    def addAction(self, id: Union[List, int], action_type: str):
+    def addAction(self, id: Union[List, int], action_type: str) -> None:
         """ add a new action to action_history and remove the oldest action
         if action_history is bigger than max_actions
 
@@ -60,7 +60,7 @@ class DrawingActionManager:
             self.action_history.pop(0)
         self.action_history.append({"type": action_type, "data": id})
 
-    def undo(self):
+    def undo(self) -> None:
         """ call undo function due to last action """
 
         if self.action_history:
