@@ -32,10 +32,10 @@ from PySide6.QtGui import (
 
 from molina.data_structs import Dataset, Worker
 from molina.central_widget import CentralWidget
-from molina.drawing_widget import TypedLine
 from molina.action_managers import FileActionManager
 from molina.file_manager import FileManager
 from molina.help_widget import HelpWindow
+from molina.hotkeys import Hotkeys
 
 
 RESOURCES_PATH = QDir("molina/resources")
@@ -120,7 +120,8 @@ class MainWindow(QMainWindow):
         self.help_button = QPushButton("Help")
         self.help_button.clicked.connect(self.showHelpWindow)
 
-        
+        self.hotkeys = Hotkeys()
+
         self.toolbar_main.addWidget(self.button_open)
         self.toolbar_main.addWidget(self.button_save)
         self.toolbar_main.addWidget(self.button_left)
@@ -141,7 +142,7 @@ class MainWindow(QMainWindow):
         self.showMaximized()
 
     def showHelpWindow(self):
-        help_window = HelpWindow()
+        help_window = HelpWindow(self.hotkeys)
         help_window.exec_()
 
     def changeImage(self, image: npt.NDArray) -> None:

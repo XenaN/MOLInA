@@ -12,11 +12,11 @@ from PySide6.QtGui import (
     QPainter,
     QPen,
     QPaintEvent,
-    QColor,
 )
 
 from molina.data_manager import DataManager
 from molina.drawing_objects import Atom, TypedLine
+from molina.hotkeys import Hotkeys
     
 
 class DrawingWidget(QWidget):
@@ -48,6 +48,10 @@ class DrawingWidget(QWidget):
         self._is_writing = False
         
         self.setFocusPolicy(Qt.StrongFocus)     
+
+        self._hotkeys = Hotkeys()
+        self._map_keys = self._hotkeys.getHotkeys()
+        self._hotkeys.mapUpdate.connect(self.setHotkeysMap)
 
         self._data_manager = DataManager()
         self._data_manager.newDataToDrawingWidget.connect(self.drawNewData)
@@ -301,6 +305,12 @@ class DrawingWidget(QWidget):
         
         self.update()
     
+    def setHotkeysMap(self, new_map: Dict) -> None:
+        """set new hotkeys map"""
+        self._map_keys = new_map
+        self._drawing_line_enabled = False
+        self._drawing_point_enabled = False
+    
     def setConstants(self, image_size: QSize) -> None:
         """ Choose smallest image side and scale all constants """
         smallest_dim = min(image_size.width(), image_size.height())
@@ -405,84 +415,17 @@ class DrawingWidget(QWidget):
             
             self.update()
         
-        elif event.key() == Qt.Key_Z and event.modifiers() == Qt.ControlModifier:
-            self._data_manager.undo()
+        elif event.modifiers() & Qt.ControlModifier:
+            if event.key() == Qt.Key_Z:
+                self._data_manager.undo()
         
         elif event.key() == Qt.Key_W:
             self._is_writing = not self._is_writing
             self._temp_atom = None
             self.update()
 
-        elif event.key() == Qt.Key_C:
-            self.setDrawingMode(True, "point", "C")
-        
-        elif event.key() == Qt.Key_N:
-            self.setDrawingMode(True, "point", "N")
-        
-        elif event.key() == Qt.Key_O:
-            self.setDrawingMode(True, "point", "O")
-        
-        elif event.key() == Qt.Key_I:
-            self.setDrawingMode(True, "point", "I")
-        
-        elif event.key() == Qt.Key_S:
-            self.setDrawingMode(True, "point", "S")
-        
-        elif event.key() == Qt.Key_F:
-            self.setDrawingMode(True, "point", "F")
-        
-        elif event.key() == Qt.Key_K:
-            self.setDrawingMode(True, "point", "K")
-
-        elif event.key() == Qt.Key_L:
-            self.setDrawingMode(True, "point", "Li")
-
-        elif event.key() == Qt.Key_R:
-            self.setDrawingMode(True, "point", "Ru")
-        
-        elif event.key() == Qt.Key_Y:
-            self.setDrawingMode(True, "point", "Y")
-
-        elif event.key() == Qt.Key_P:
-            self.setDrawingMode(True, "point", "P")
-        
-        elif event.key() == Qt.Key_A:
-            self.setDrawingMode(True, "point", "Al")
-        
-        elif event.key() == Qt.Key_G:
-            self.setDrawingMode(True, "point", "Ga")
-
-        elif event.key() == Qt.Key_Z:
-            self.setDrawingMode(True, "point", "Zn")
-
-        elif event.key() == Qt.Key_V:
-            self.setDrawingMode(True, "point", "V")
-        
-        elif event.key() == Qt.Key_B:
-            self.setDrawingMode(True, "point", "B")
-        
-        elif event.key() == Qt.Key_M:
-            self.setDrawingMode(True, "point", "Mn")
-
-        elif event.key() == Qt.Key_1:
-            self.setDrawingMode(True, "line", "single")
-        
-        elif event.key() == Qt.Key_2:
-            self.setDrawingMode(True, "line", "double")
-
-        elif event.key() == Qt.Key_3:
-            self.setDrawingMode(True, "line", "triple")
-
-        elif event.key() == Qt.Key_4:
-            self.setDrawingMode(True, "line", "aromatic")
-        
-        elif event.key() == Qt.Key_5:
-            self.setDrawingMode(True, "line", "solid wedge")
-        
-        elif event.key() == Qt.Key_6:
-            self.setDrawingMode(True, "line", "solid unwedge")
-        
-        elif event.key() == Qt.Key_7:
-            self.setDrawingMode(True, "line", "dashed wedge")
+        elif self._map_keys[chr(event.key())]:
+            type_action, name = self._map_keys[chr(event.key())][0], self._map_keys[chr(event.key())][1]
+            self.setDrawingMode(True, type_action, name)
         
         
