@@ -92,10 +92,8 @@ class MainWindow(QMainWindow):
         self.button_save.pressed.connect(self.data_images.saveAnnotation)
 
         self.button_left = QToolButton()
-        self.button_left.setIcon(QIcon(RESOURCES_PATH.filePath("left_button.png")))
-        
-        self.button_right = QToolButton()
-        self.button_right.setIcon(QIcon(RESOURCES_PATH.filePath("right_button.png")))
+        self.button_left.setIcon(QIcon(RESOURCES_PATH.filePath("left_button_2.png")))
+        self.button_left.pressed.connect(self.leftImage)
 
         self.recent_menu = QMenu()
         self.button_recent = QToolButton()
@@ -125,7 +123,6 @@ class MainWindow(QMainWindow):
         self.toolbar_main.addWidget(self.button_open)
         self.toolbar_main.addWidget(self.button_save)
         self.toolbar_main.addWidget(self.button_left)
-        self.toolbar_main.addWidget(self.button_right)
         self.toolbar_main.addWidget(self.button_recent)
         self.toolbar_main.addWidget(self.button_clean)
         self.toolbar_main.addWidget(self.button_current_model)       
@@ -257,6 +254,11 @@ class MainWindow(QMainWindow):
         menu_pos = self.button_recent.parentWidget().mapToGlobal(self.button_recent.geometry().bottomLeft())
         self.recent_menu.popup(menu_pos)
     
+    def leftImage(self) -> None:
+        if len(self.fileAction.getRecentImages()) != 0:
+            left_image_path = self.fileAction.getRecentImages()[-1]
+            self.changeCurrentImage(left_image_path)
+
     def setModel(self, model_name: str) -> None:
         """ Change current model according to user click """
         self.data_images.setCurrentModel(model_name)

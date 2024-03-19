@@ -345,11 +345,12 @@ class DrawingWidget(QWidget):
 
     def clearAll(self) -> None:
         """ Reset drawing data """
-        self._lines = []
-        self._points = []
-        self._temp_line = None
-        self._data_manager.allDeleted()
-        self.update()
+        if len(self._points) != 0:
+            self._lines = []
+            self._points = []
+            self._temp_line = None
+            self._data_manager.allDeleted()
+            self.update()
 
     def mousePressEvent(self, event: QPaintEvent) -> None:
         """ Set point mode or line mode if left button is clicked.
@@ -427,8 +428,8 @@ class DrawingWidget(QWidget):
         else:
             key = event.key()
             try:
-                if self._map_keys[chr(event.key())]:
-                    type_action, name = self._map_keys[chr(event.key())][0], self._map_keys[chr(event.key())][1]
+                if self._map_keys[chr(key)]:
+                    type_action, name = self._map_keys[chr(key)][0], self._map_keys[chr(key)][1]
                     self.setDrawingMode(True, type_action, name)
             except (ValueError, KeyError):
                 pass
