@@ -221,6 +221,13 @@ class MainWindow(QMainWindow):
         self.worker.result.connect(self.onModelCompleted)
 
         self.thread.start()
+    
+    def closeEvent(self, event) -> None:
+        """ Finish thread if application was closed """
+        if self.thread and self.thread.isRunning(): 
+            self.thread.terminate()
+
+        event.accept()
 
     def onModelCompleted(self, model_result: Dict) -> None:
         """ Unblock FileManager and toolbar and change annotation text """
@@ -255,6 +262,7 @@ class MainWindow(QMainWindow):
         self.recent_menu.popup(menu_pos)
     
     def leftImage(self) -> None:
+        """ Shift in recently opened image list """
         if len(self.fileAction.getRecentImages()) != 0:
             left_image_path = self.fileAction.getRecentImages()[-1]
             self.changeCurrentImage(left_image_path)
