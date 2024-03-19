@@ -119,6 +119,7 @@ class MainWindow(QMainWindow):
         self.help_button.clicked.connect(self.showHelpWindow)
 
         self.hotkeys = Hotkeys()
+        self.thread = None
 
         self.toolbar_main.addWidget(self.button_open)
         self.toolbar_main.addWidget(self.button_save)
@@ -224,8 +225,9 @@ class MainWindow(QMainWindow):
     
     def closeEvent(self, event) -> None:
         """ Finish thread if application was closed """
-        if self.thread and self.thread.isRunning(): 
-            self.thread.terminate()
+        if self.thread:
+            if self.thread.isRunning(): 
+                self.thread.terminate()
 
         event.accept()
 
