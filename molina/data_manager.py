@@ -214,29 +214,32 @@ class DataManager(QObject):
         if self._atoms["deleted"].all() != True:
             self._atoms.loc[self._atoms["deleted"] == False, "atom_number"] = np.arange(length)
     
-        if not self._bonds.empty:
+        if not self._bonds.empty and self._bonds["deleted"].all() != True:
+            
+            bonds = self._bonds.loc[self._bonds["deleted"] == False]
 
-            uids_bond = self._bonds.loc[self._bonds['endpoint_atoms'].apply(
+            uids_bond = bonds.loc[bonds['endpoint_atoms'].apply(
                 lambda endpoints: index in endpoints), "id"].to_list()
 
-            self._bonds.loc[self._bonds['endpoint_atoms'].apply(
-                lambda endpoints: index in endpoints), 'deleted'] = True
+            if uids_bond:
 
-            self._recombineEndpoints()
+                self._bonds.loc[self._bonds['endpoint_atoms'].apply(
+                    lambda endpoints: index in endpoints), 'deleted'] = True
 
-            if self._bonds["deleted"].all() != True:
+                self._recombineEndpoints()
+
                 length_bond = self._bonds.loc[self._bonds["deleted"] == False].shape[0]
                 self._bonds.loc[self._bonds["deleted"] == False, 
                                 "line_number"] = np.arange(length_bond)
 
-            self._action_manager.addAction((uid, uids_bond), "delete_atom_and_bond")
+                self._action_manager.addAction((uid, uids_bond), "delete_atom_and_bond")
 
-            line_idxs = self._bonds.loc[self._bonds["id"].isin(uids_bond), "line_number"].to_list()
-            line_idxs.reverse()
-            
-            if len(line_idxs) != 0:
-                for i in line_idxs:
-                    self.lineUpdate.emit("delete", i, None)
+                line_idxs = self._bonds.loc[self._bonds["id"].isin(uids_bond), "line_number"].to_list()
+                line_idxs.reverse()
+                
+                if len(line_idxs) != 0:
+                    for i in line_idxs:
+                        self.lineUpdate.emit("delete", i, None)
         
         else:
             self._action_manager.addAction(uid, "delete_atom")

@@ -98,7 +98,7 @@ class DrawingWidget(QWidget):
     def getScaledConstants(self, threshold: float) -> float:
         """ Scaled thresholds or sizes, or return maximum or minimum value """
         value = threshold * self._zoom_factor
-        return 1 if value < 1 else 100 if value > 100 else value
+        return 3 if value < 3 else 100 if value > 100 else value
     
     def getScaledBondConstants(self, bond_constants: float) -> float:
         """ Scaled thresholds or distances, or return maximum or minimum value """
@@ -185,6 +185,7 @@ class DrawingWidget(QWidget):
     
     def createToleranceRectangle(self, start: QPoint, end: QPoint, tolerance: int) -> QRect:
         """ Calculate tolerance rectangle around line """
+        tolerance = tolerance["bond_distance"]
         if start.x() == end.x():  # Vertical line
             return QRect(start.x() - tolerance // 2, min(start.y(), end.y()),
                         tolerance, abs(start.y() - end.y()))
@@ -399,7 +400,7 @@ class DrawingWidget(QWidget):
         
         if self._is_writing:
             if event.key() == Qt.Key_Return:
-                if self._temp_atom and self._temp_text != "":
+                if self._temp_atom is not None and self._temp_text != "":
                     self._temp_atom.name = self._temp_text
                     self.addPoint(self._temp_atom)
                 self._is_writing = False

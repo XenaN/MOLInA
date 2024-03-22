@@ -217,17 +217,21 @@ class MainWindow(QMainWindow):
 
         self.thread.started.connect(self.worker.run)
         self.worker.finished.connect(self.thread.quit)
-        self.worker.finished.connect(self.worker.deleteLater)
-        self.thread.finished.connect(self.thread.deleteLater)
+        self.thread.finished.connect(self.onThreadFinished)
         self.worker.result.connect(self.onModelCompleted)
 
         self.thread.start()
     
+    def onThreadFinished(self) -> None:
+        """ Clean thread and worker after prediction finishing"""
+        self.worker.deleteLater()
+        self.thread = None
+
     def closeEvent(self, event) -> None:
         """ Finish thread if application was closed """
-        if self.thread:
-            if self.thread.isRunning(): 
-                self.thread.terminate()
+        if self.thread and self.thread.isRunning(): 
+            self.thread.terminate()
+            self.thread.wait()
 
         event.accept()
 

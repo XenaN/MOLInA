@@ -44,7 +44,10 @@ class Hotkeys(QObject):
                           "4": ("line", "aromatic"),
                           "5": ("line", "solid wedge"),
                           "6": ("line", "solid unwedge"),
-                          "7": ("line", "dashed wedge"),}
+                          "7": ("line", "dashed wedge"),
+                        #   "8": ("line", "hydrogen"),
+                        #   "9": ("line", "dative"),
+                          }
     
     def getHotkeys(self) -> Dict:
         """ Return hotkeys"""
