@@ -119,6 +119,7 @@ class DataManager(QObject):
             if "confidence" not in self._bonds.columns:
                 self._bonds["confidence"] = "not_modeling"
 
+        self._action_manager = DrawingActionManager(self)
         self.newDataToDrawingWidget.emit()
     
     def addAtom(self, atom: Atom, idx: int) -> None:

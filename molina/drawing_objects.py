@@ -213,3 +213,4 @@ class Atom:
 
             painter.setPen(QPen(QColor(0, 0, 255)))  # Blue rectangle
             painter.drawRect(rect_x + 2, rect_y + 2, rect_width, rect_height)
+            

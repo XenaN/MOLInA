@@ -184,4 +184,3 @@ class CentralWidget(QWidget):
         palette.setColor(QPalette.Window, color)
         widget.setPalette(palette)
     
-

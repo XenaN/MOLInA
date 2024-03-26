@@ -102,4 +102,3 @@ class HelpWindow(QDialog):
         new_value = value_edit.text()
         self.hotkeys.setNewValue(key, new_value)
         value_edit.clearFocus()
-

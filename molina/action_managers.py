@@ -83,4 +83,3 @@ class DrawingActionManager:
             elif action_type == "delete_atom_and_bond":
                 # Undo delete point and lines by re-adding the point and lines
                 self.widget.undoDeleteAtomAndBond(data)
-
