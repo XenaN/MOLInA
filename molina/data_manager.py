@@ -15,6 +15,7 @@ class DataManager(QObject):
     pointUpdate = Signal(str, object, object)
     lineUpdate = Signal(str, object, object)
     lineIndexUpdate = Signal(object)
+    atomPositionUpdate = Signal(int, object)
     """
     DataManager managers the exchange of information between DrawingWidget and Dataset.
     DrawingWidget needs coordinates, image size, types of bonds, and atoms.
@@ -395,3 +396,39 @@ class DataManager(QObject):
             
         self._recombineEndpoints()
         self._sendDataToDataset()
+    
+    def updateAtomPosition(self, index: int, position: QPoint) -> None:
+        """ When atom was moved change its position here """
+        atom = self._atoms.loc[(self._atoms["deleted"] == False) & 
+                        (self._atoms["atom_number"] == index),
+                        "atom_instance"].item()
+
+        self._action_manager.addAction((index, atom.position), "move_atom")
+
+        self._atoms.loc[(self._atoms["deleted"] == False) & 
+                        (self._atoms["atom_number"] == index),
+                        "atom_instance"].item().position = position
+        self._atoms.loc[(self._atoms["deleted"] == False) & 
+                        (self._atoms["atom_number"] == index),
+                        "x"] = position.x()
+        self._atoms.loc[(self._atoms["deleted"] == False) & 
+                        (self._atoms["atom_number"] == index),
+                        "y"] = position.y()
+        
+        self._sendDataToDataset()
+    
+    def undoUpdateAtomPosition(self, data: Tuple[int, QPoint]) -> None:
+        """ Return old position """
+        index, old_position = data
+        self._atoms.loc[(self._atoms["deleted"] == False) & 
+                        (self._atoms["atom_number"] == index),
+                        "atom_instance"].item().position = old_position
+        self._atoms.loc[(self._atoms["deleted"] == False) & 
+                        (self._atoms["atom_number"] == index),
+                        "x"] = old_position.x()
+        self._atoms.loc[(self._atoms["deleted"] == False) & 
+                        (self._atoms["atom_number"] == index),
+                        "y"] = old_position.y()
+        
+        self._sendDataToDataset()
+        self.atomPositionUpdate.emit(index, old_position)

@@ -1,4 +1,4 @@
-from typing import Union, List
+from typing import Any, List
 
 class FileActionManager:
     """
@@ -48,8 +48,16 @@ class DrawingActionManager:
         self.widget = widget
         self.action_history = []
         self.max_actions = 15
+        self._map_actions = {
+            "add_atom": self.widget.undoAddAtom,
+            "delete_atom": self.widget.undoDeleteAtom,
+            "add_bond": self.widget.undoAddBond,
+            "delete_bond": self.widget.undoDeleteBond,
+            "delete_atom_and_bond": self.widget.undoDeleteAtomAndBond,
+            "move_atom": self.widget.undoUpdateAtomPosition,
+        }
 
-    def addAction(self, id: Union[List, int], action_type: str) -> None:
+    def addAction(self, data: Any, action_type: str) -> None:
         """ add a new action to action_history and remove the oldest action
         if action_history is bigger than max_actions
 
@@ -58,7 +66,7 @@ class DrawingActionManager:
         """
         if len(self.action_history) >= self.max_actions:
             self.action_history.pop(0)
-        self.action_history.append({"type": action_type, "data": id})
+        self.action_history.append({"type": action_type, "data": data})
 
     def undo(self) -> None:
         """ call undo function due to last action """
@@ -68,18 +76,4 @@ class DrawingActionManager:
             action_type = last_action["type"]
             data = last_action["data"]
 
-            if action_type == "add_atom":
-                # Undo add point by removing the last point
-                self.widget.undoAddAtom(data)
-            elif action_type == "delete_atom":
-                # Undo delete point by re-adding the point
-                self.widget.undoDeleteAtom(data)
-            elif action_type == "add_bond":
-                # Undo add line by removing the last line
-                self.widget.undoAddBond(data)
-            elif action_type == "delete_bond":
-                # Undo delete line by re-adding the line
-                self.widget.undoDeleteBond(data)
-            elif action_type == "delete_atom_and_bond":
-                # Undo delete point and lines by re-adding the point and lines
-                self.widget.undoDeleteAtomAndBond(data)
+            self._map_actions[action_type](data)

@@ -59,6 +59,7 @@ class DrawingWidget(QWidget):
         self._data_manager.pointUpdate.connect(self.updatePoint)
         self._data_manager.lineUpdate.connect(self.updateLine)
         self._data_manager.lineIndexUpdate.connect(self.updateLineIndex)
+        self._data_manager.atomPositionUpdate.connect(self.updateAtomPosition)
 
     def paintEvent(self, event: QPaintEvent) -> None:
         """ Function to draw points and lines """
@@ -311,6 +312,13 @@ class DrawingWidget(QWidget):
         
         self.update()
     
+    def updateAtomPosition(self, index: int, position: QPoint) -> None:
+        """ Set new position to atom """
+        scaled_position = QPoint(position.x() * self._zoom_factor,
+                                 position.y() * self._zoom_factor,)
+        self._points[index].position = scaled_position
+        self.update()
+    
     def setHotkeysMap(self, new_map: Dict) -> None:
         """set new hotkeys map"""
         self._map_keys = new_map
@@ -405,6 +413,9 @@ class DrawingWidget(QWidget):
             self._temp_line = None
         
         elif self._selected_atom_idx is not None:
+                not_scaled_position = QPoint(event.pos().x() / self._zoom_factor,
+                                             event.pos().y() / self._zoom_factor)
+                self._data_manager.updateAtomPosition(self._selected_atom_idx, not_scaled_position)
                 self._selected_atom_idx = None 
 
     def keyPressEvent(self, event: QPaintEvent) -> None:
