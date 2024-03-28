@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, Union, List
 
 from PySide6.QtWidgets import QWidget
 from PySide6.QtCore import (
@@ -36,6 +36,7 @@ class DrawingWidget(QWidget):
         self._atom_type = None
         self._bond_type = None
         self._temp_atom = None
+        self._selected_atom_idx = None
         
         self._zoom_factor = 1.0
         
@@ -54,9 +55,10 @@ class DrawingWidget(QWidget):
         self._hotkeys.mapUpdate.connect(self.setHotkeysMap)
 
         self._data_manager = DataManager()
-        self._data_manager.newDataToDrawingWidget.connect(self.drawNewData)
+        self._data_manager.newDataToDrawingWidget.connect(self.updateDrawScale)
         self._data_manager.pointUpdate.connect(self.updatePoint)
         self._data_manager.lineUpdate.connect(self.updateLine)
+        self._data_manager.lineIndexUpdate.connect(self.updateLineIndex)
 
     def paintEvent(self, event: QPaintEvent) -> None:
         """ Function to draw points and lines """
@@ -66,30 +68,31 @@ class DrawingWidget(QWidget):
         pen = QPen(Qt.red, 5)
         painter.setPen(pen)
 
+        text_size = int(self.getScaledConstants(self._text_size))
+        bond_constants = self.getScaledBondConstants(self._bond_constant)
+
         for line in self._lines:
-            line.constants = self.getScaledBondConstants(self._bond_constant)
-            line.draw(painter)
+            line.update(self._points[line.atom_indexes[0]].position,
+                        self._points[line.atom_indexes[1]].position)
+            line.draw(painter, bond_constants)
 
         for point in self._points:
-            point.size = int(self.getScaledConstants(self._text_size))
-            point.draw(painter)
+            point.draw(painter, text_size)
 
         # Draw current text being written
         if self._temp_atom:
-            self._temp_atom.size = int(self.getScaledConstants(self._text_size))
-            self._temp_atom.draw(painter, self._is_writing)
+            self._temp_atom.draw(painter, text_size, self._is_writing)
 
         # Draw current line while button mouse is pushed       
         if self._temp_line:
-            self._temp_line.draw(painter)
+            self._temp_line.draw(painter, bond_constants)
     
     def addPoint(self, atom: Atom) -> None:
         """ Add atom to DataManager data """
         not_scaled_atom = Atom(QPoint(atom.position.x() / self._zoom_factor, 
                                       atom.position.y() / self._zoom_factor),
-                               atom.name,
-                               atom.size)
-        
+                               atom.name)
+
         self._points.append(atom)
 
         self._data_manager.addAtom(not_scaled_atom, len(self._points)-1)
@@ -125,7 +128,7 @@ class DrawingWidget(QWidget):
                                              "idx": i})
             elif distance_to_end <= threshold:
                 close_point["end"].append({"pos": point, 
-                                             "idx": i})
+                                           "idx": i})
         
         # Check how many atoms are founded, if two - ok
         if (len(close_point["start"]) + len(close_point["end"])) == 2: 
@@ -137,23 +140,22 @@ class DrawingWidget(QWidget):
         """ Add bond to DataManager data """
         atoms = self.findAtoms(line.line)
         if atoms:
-            p1, p2 = atoms["start"][0]["pos"], atoms["end"][0]["pos"]
-            line_from_atom = QLine(p1, p2)
-            line.line = line_from_atom
+            atom1, atom2 = atoms["start"][0]["pos"], atoms["end"][0]["pos"]
+            # Change line ends with closest atoms position
+            line.setAtomIndexes([atoms["start"][0]["idx"], atoms["end"][0]["idx"]])
+            line.update(atom1, atom2)
             self._lines.append(line)
 
-            not_scaled_line = QLine(line_from_atom.x1() / self._zoom_factor, 
-                                    line_from_atom.y1() / self._zoom_factor,
-                                    line_from_atom.x2() / self._zoom_factor,
-                                    line_from_atom.y2() / self._zoom_factor)
-            
-            self._data_manager.addBond(TypedLine(not_scaled_line, 
-                                                 line.type, 
-                                                 self._bond_constant),
+            not_scaled_line = QLine(atom1.x() / self._zoom_factor, 
+                                    atom1.y() / self._zoom_factor,
+                                    atom2.x() / self._zoom_factor,
+                                    atom2.y() / self._zoom_factor)
+
+            self._data_manager.addBond(TypedLine(not_scaled_line,
+                                                 line.type,
+                                                 line.atom_indexes),
                                        [atoms["start"][0]["idx"], atoms["end"][0]["idx"]], 
                                        len(self._lines)-1)
-        else: 
-            self._temp_line = None
 
         self.update()
     
@@ -211,23 +213,27 @@ class DrawingWidget(QWidget):
 
         return abs(d1 + d2 - line_length) < 1e-5 
 
-    def findClosestObject(self, position: QPoint) -> None:
+    def findClosestObject(self, position: QPoint, flag: bool = "deletion") -> Union[None, int]:
         """ According to scaled threshold choose the closest object and delete it """
         threshold = self.getScaledConstants(self._closest_atom_threshold)
         
         for i in range(len(self._points)):
             distance = (position - self._points[i].position).manhattanLength()
             if distance <= threshold:
-                 self.deletePoint(i)
-                 return
-
-        for i in range(len(self._lines)):
-            center = self.lineCenter(self._lines[i].line)
-            part_P1 = self.partLine(self._lines[i].line.p1(), center)
-            part_P2 = self.partLine(self._lines[i].line.p2(), center)
-            if self.isPointOnLineSegment(part_P1, part_P2, position):
-                self.deleteLine(i)
-                return
+                 if flag == "deletion":
+                    self.deletePoint(i)
+                    return
+                 elif flag == "search":
+                     return i
+                 
+        if flag == "deletion":
+            for i in range(len(self._lines)):
+                center = self.lineCenter(self._lines[i].line)
+                part_P1 = self.partLine(self._lines[i].line.p1(), center)
+                part_P2 = self.partLine(self._lines[i].line.p2(), center)
+                if self.isPointOnLineSegment(part_P1, part_P2, position):
+                    self.deleteLine(i)
+                    return
 
     def setDrawingMode(self, enabled: bool, type: str, info: str) -> None:
         """ Set flag for drawing line or point mode """
@@ -245,36 +251,23 @@ class DrawingWidget(QWidget):
     def updateDrawScale(self) -> None:
         """ Scale data after change image size """
         not_scaled_data = self._data_manager.getDrawingData()
-
+        import copy
         if len(not_scaled_data["points"]) != 0:
             if len(self._points) != len(not_scaled_data["points"]):
-                self._points = [Atom(atom.position, atom.name, atom.size) for atom in not_scaled_data["points"]]
+                self._points = [Atom(atom.position, atom.name) for atom in not_scaled_data["points"]]
             
             for i in range(len(not_scaled_data["points"])):
                 point = not_scaled_data["points"][i]
                 self._points[i].position = QPoint(point.position.x() * self._zoom_factor,
                                                   point.position.y() * self._zoom_factor)
-            
-            if len(not_scaled_data["lines"]) != 0:
-                if len(self._lines) != len(not_scaled_data["lines"]):
-                    self._lines = [TypedLine(line.line, line.type, line.constants) for line in not_scaled_data["lines"]]
-                
-                for i in range(len(not_scaled_data["lines"])):
-                    line = not_scaled_data["lines"][i]
-                    self._lines[i].line = QLine(
-                        line.line.x1() * self._zoom_factor,
-                        line.line.y1() * self._zoom_factor,
-                        line.line.x2() * self._zoom_factor,
-                        line.line.y2() * self._zoom_factor)
+
+            line_length = len(not_scaled_data["lines"])
+            if line_length != 0:
+                if len(self._lines) != line_length:
+                    self._lines = [TypedLine(line.line, line.type, line.atom_indexes) 
+                                   for line in not_scaled_data["lines"]]
                                                   
             self.update()
-    
-    def drawNewData(self):
-        """ Set not scaled distances and font size to DataManager data
-          and scale data to draw it 
-        """
-        self._data_manager.updateDistances(self._text_size, self._bond_constant)
-        self.updateDrawScale()
     
     def updatePoint(self, update_type: str, idx: Optional[int] = None, point: Optional[Atom] = None) -> None:
         """ Delete or add atom """
@@ -285,7 +278,7 @@ class DrawingWidget(QWidget):
         elif update_type == "add":
             scaled_point = QPoint(point.position.x() * self._zoom_factor,
                                   point.position.y() * self._zoom_factor)
-            self._points.insert(idx, Atom(scaled_point, point.name, point.size))
+            self._points.insert(idx, Atom(scaled_point, point.name))
         
         self.update()
 
@@ -294,15 +287,27 @@ class DrawingWidget(QWidget):
         """ Delete or add bond """
         if update_type == "delete" and idx is None:
             self._lines.pop()
+            self.update()
         elif update_type == "delete" and idx is not None:
             self._lines.pop(idx)
+            self.update()
         elif update_type == "add":
             new_line = QLine(line.line.x1() * self._zoom_factor,
                              line.line.y1() * self._zoom_factor,
                              line.line.x2() * self._zoom_factor,
                              line.line.y2() * self._zoom_factor)
             
-            self._lines.insert(idx, TypedLine(new_line, line.type, line.constants))
+            self._lines.insert(idx, TypedLine(new_line, line.type, line.atom_indexes))
+    
+    def updateLineIndex(self, endpoints: List[List[int]]) -> None:
+        """ Change atom indexes in lines to actual """
+        assert len(endpoints) == len(self._lines)
+
+        for i in range(len(self._lines)):
+            line = self._lines[i]
+            assert len(endpoints[i]) == 2
+
+            line.atom_indexes = endpoints[i]
         
         self.update()
     
@@ -334,6 +339,7 @@ class DrawingWidget(QWidget):
         self._points = []
         self._temp_text = ""
         self._temp_line = None
+        self._selected_atom_idx = None
         self._zoom_factor = 1.0
         self._text_size = None
         self._bond_constant = None
@@ -350,6 +356,7 @@ class DrawingWidget(QWidget):
             self._lines = []
             self._points = []
             self._temp_line = None
+            self._selected_atom_idx = None
             self._data_manager.allDeleted()
             self.update()
 
@@ -359,27 +366,36 @@ class DrawingWidget(QWidget):
         """
         if event.button() == Qt.LeftButton:
             if self._drawing_point_enabled:
-                self.addPoint(Atom(event.pos(), self._atom_type, self._text_size))
+                self.addPoint(Atom(event.pos(), self._atom_type))
 
             elif self._drawing_line_enabled:
                 self._temp_line = TypedLine(QLine(event.pos(), event.pos()),
-                                            self._bond_type, 
-                                            self.getScaledBondConstants(self._bond_constant))
+                                            self._bond_type)
             
             elif self._is_writing:
-                self._temp_atom = Atom(event.pos(), "", self._text_size)
+                self._temp_atom = Atom(event.pos(), "")
                 self._temp_text = ""
                 self.update()
+            
+            else:
+                atom_idx = self.findClosestObject(event.pos(), "search")
+                if atom_idx is not None:
+                    self._selected_atom_idx = atom_idx
                 
         elif event.button() == Qt.RightButton:
-            self.findClosestObject(event.pos())
+            self.findClosestObject(event.pos(), "deletion")
     
     def mouseMoveEvent(self, event) -> None:
         """ Draw temporal line while mouse button pushed """
         if self._drawing_line_enabled:
             if self._temp_line:
+                # Move one end of temporal line
                 self._temp_line.line.setP2(event.pos())
-                self.update()
+        elif self._selected_atom_idx is not None:
+            # Move the selected atom
+            self._points[self._selected_atom_idx].position = event.pos()
+        
+        self.update()
     
     def mouseReleaseEvent(self, event) -> None:
         """ Add line if two atoms are nearby """
@@ -387,6 +403,9 @@ class DrawingWidget(QWidget):
             self._temp_line.constants = self._bond_constant
             self.addLine(self._temp_line)
             self._temp_line = None
+        
+        elif self._selected_atom_idx is not None:
+                self._selected_atom_idx = None 
 
     def keyPressEvent(self, event: QPaintEvent) -> None:
         """ Run action according to the key pressed """
@@ -397,8 +416,15 @@ class DrawingWidget(QWidget):
             self._drawing_line_enabled = False
         elif self._drawing_point_enabled:
             self._drawing_point_enabled = False
+
+        if event.key() == Qt.Key_Escape:
+            if self._is_writing:
+                self._is_writing = False
+                self._temp_text = ""
+                self._temp_atom = None
+                self.update() 
         
-        if self._is_writing:
+        elif self._is_writing:
             if event.key() == Qt.Key_Return:
                 if self._temp_atom is not None and self._temp_text != "":
                     self._temp_atom.name = self._temp_text
@@ -434,5 +460,3 @@ class DrawingWidget(QWidget):
                     self.setDrawingMode(True, type_action, name)
             except (ValueError, KeyError):
                 pass
-        
-        
