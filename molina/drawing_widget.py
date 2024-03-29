@@ -155,7 +155,7 @@ class DrawingWidget(QWidget):
             self._data_manager.addBond(TypedLine(not_scaled_line,
                                                  line.type,
                                                  line.atom_indexes),
-                                       [atoms["start"][0]["idx"], atoms["end"][0]["idx"]], 
+                                       atoms["start"][0]["idx"], atoms["end"][0]["idx"], 
                                        len(self._lines)-1)
 
         self.update()
@@ -377,7 +377,7 @@ class DrawingWidget(QWidget):
                 self.addPoint(Atom(event.pos(), self._atom_type))
 
             elif self._drawing_line_enabled:
-                self._temp_line = TypedLine(QLine(event.pos(), event.pos()),
+                self._temp_line = TypedLine(QLine(event.pos(), event.pos()), 
                                             self._bond_type)
             
             elif self._is_writing:
