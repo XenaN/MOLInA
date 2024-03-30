@@ -163,7 +163,7 @@ class DataManager(QObject):
             "bond_type": line.type,
             "start_atom_idx": start_atom_idx,
             "end_atom_idx": end_atom_idx,
-            "endpoint_atoms": [start_atom_idx, end_atom_idx],
+            "endpoint_atoms": [[start_atom_idx, end_atom_idx]],
             "confidence": "not_modeling",
             "deleted": False
         }, index=[0])

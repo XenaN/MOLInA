@@ -155,7 +155,8 @@ class DrawingWidget(QWidget):
             self._data_manager.addBond(TypedLine(not_scaled_line,
                                                  line.type,
                                                  line.atom_indexes),
-                                       atoms["start"][0]["idx"], atoms["end"][0]["idx"], 
+                                       atoms["start"][0]["idx"], 
+                                       atoms["end"][0]["idx"], 
                                        len(self._lines)-1)
 
         self.update()
