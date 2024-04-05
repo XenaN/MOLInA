@@ -1,20 +1,21 @@
 from PySide6.QtWidgets import (
-    QDialog, 
-    QVBoxLayout, 
-    QHBoxLayout, 
-    QScrollArea, 
-    QWidget, 
-    QLabel, 
-    QSpacerItem, 
+    QDialog,
+    QVBoxLayout,
+    QHBoxLayout,
+    QScrollArea,
+    QWidget,
+    QLabel,
+    QSpacerItem,
     QSizePolicy,
     QLineEdit,
 )
 
 
 class HelpWindow(QDialog):
-    """Help window describes abilities of applications. 
+    """Help window describes abilities of applications.
     Here user can change hotkeys for atoms.
     """
+
     def __init__(self, hotkeys):
         super().__init__()
         self.setWindowTitle("Help")
@@ -44,35 +45,35 @@ class HelpWindow(QDialog):
 
         <p style='text-indent: 20px;'><b>W:</b></b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; write any atom or group </p>
         """
-        
+
         self.intro_label = QLabel(self.formatted_text)
         self.intro_label.setWordWrap(True)
         self.intro_label.setMaximumWidth(750)
         self.content_layout.addWidget(self.intro_label)
-        
+
         # Create label and line edit for each key-value pair
         self.edit_fields = {}
         self.margin = 20
         self.spacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
-        
+
         for key, value in self.map_keys.items():
             row_layout = QHBoxLayout()
-            
+
             key_label = QLabel(f"{key}:")
             key_label.setFixedWidth(30 + self.margin)
             key_label.setStyleSheet(f"font-weight: bold; margin-left: {self.margin}px;")
-            
+
             if key.isalpha():
                 value = QLineEdit(value[1])
                 value.returnPressed.connect(lambda key=key: self.onReturnPressed(key))
                 self.edit_fields[key] = value
             else:
                 value = QLabel(f"{value[1]} bond")
-            
+
             value.setMaximumWidth(150)
             row_layout.addWidget(key_label, 0)
             row_layout.addWidget(value, 0)
-           
+
             row_layout.addSpacerItem(self.spacer)
             self.content_layout.addLayout(row_layout)
 
@@ -97,7 +98,7 @@ class HelpWindow(QDialog):
         self.layout.addWidget(self.scroll_area)
 
     def onReturnPressed(self, key) -> None:
-        """ When Enter is pressed value for hotkeys saves and the focus is reset """
+        """When Enter is pressed value for hotkeys saves and the focus is reset"""
         value_edit = self.edit_fields[key]
         new_value = value_edit.text()
         self.hotkeys.setNewValue(key, new_value)
