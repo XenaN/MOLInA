@@ -26,19 +26,19 @@ Here's a look at the main interface of MOLInA:
 
 When you open image
 
-<img src="https://github.com/XenaN/MOLInA/assets/43779450/e651b6e3-f817-401e-9e1a-2b9c8c18f292" alt="screen1" width="874" height="432">
+<img src="https://github.com/XenaN/MOLInA/assets/43779450/cdab674d-6372-4c18-9c7c-efbc671920a4" alt="screen1" width="754" height="428">
 
-When you open and add atoms and bonds
+When you add atoms and bonds
 
-<img src="https://github.com/XenaN/MOLInA/assets/43779450/4e8d390c-f4c6-4108-8669-58ed89c70df7" alt="screen1" width="874" height="432">
+<img src="https://github.com/XenaN/MOLInA/assets/43779450/152ea866-c6a7-4e7f-bfd5-e244b8203450" alt="screen1" width="754" height="428">
 
 Choose model
 
-<img src="https://github.com/XenaN/MOLInA/assets/43779450/e3ac0a7e-85b7-4497-a40a-0a29d997a7ad" alt="screen1" width="874" height="432">
+<img src="https://github.com/XenaN/MOLInA/assets/43779450/334bc0ac-956a-4543-9a35-59bf141f33b4" alt="screen1" width="754" height="428">
 
 Show (you can choose) recently opened image
 
-<img src="https://github.com/XenaN/MOLInA/assets/43779450/a8145a45-0f92-42cd-a783-090f4015e7fc" alt="screen1" width="874" height="432">
+<img src="https://github.com/XenaN/MOLInA/assets/43779450/e090dd1a-2680-47d8-aad6-2e9910af789a" alt="screen1" width="874" height="428">
 
 ## How To Use
 
