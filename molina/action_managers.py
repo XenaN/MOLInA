@@ -1,4 +1,5 @@
 from typing import Any, List
+from pathlib import Path
 
 
 class FileActionManager:
@@ -19,6 +20,7 @@ class FileActionManager:
 
         :param image_path: path to chosen image
         """
+        image_path = Path(image_path)
         if image_path in self.recent_images:
             self.recent_images.remove(image_path)
 

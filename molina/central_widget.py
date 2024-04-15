@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt, QDir
+from PySide6.QtCore import Qt, QDir, QEvent
 from PySide6.QtWidgets import (
     QToolButton,
     QLabel,
@@ -8,7 +8,6 @@ from PySide6.QtWidgets import (
     QStackedLayout,
     QWidget,
     QScrollArea,
-    QSizePolicy,
 )
 from PySide6.QtGui import (
     QPalette,
@@ -18,10 +17,10 @@ from PySide6.QtGui import (
 )
 
 from molina.drawing_widget import DrawingWidget
+from molina.styles import SCROLLBAR_STYLE, FOCUSED, UNFOCUSED, COLOR_BACKGROUND_WIDGETS
 
 
 RESOURCES_PATH = QDir("molina/resources")
-COLOR_BACKGROUND_WIDGETS = QColor(250, 250, 250)
 
 
 class CentralWidget(QWidget):
@@ -32,6 +31,11 @@ class CentralWidget(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setObjectName("CentralWidget")
+        self.updateStyleSheet(focused=False)
+
+        self.setAttribute(Qt.WA_StyledBackground, True)
+
         # Relation between image size, and widget size, then it changes depending on zooming
         self._scale_factor = 1
         self._pixmap = QPixmap()
@@ -63,15 +67,20 @@ class CentralWidget(QWidget):
         self.image_container.setLayout(self.image_layout)
 
         self.image_widget = QLabel()
+        self.image_widget.setStyleSheet(
+            "QWidget { border: none; background-color: white; }"
+        )
         self.image_widget.setAlignment(Qt.AlignCenter)
         self.image_widget.setMinimumSize(200, 200)
 
         self.container_widget = QWidget()
+        self.container_widget.setStyleSheet("QWidget { border: none; }")
         self.container_layout = QHBoxLayout(self.container_widget)
         self.container_layout.setContentsMargins(0, 0, 0, 0)
 
         self.drawing_widget = DrawingWidget()
         self.drawing_widget.setFocus()
+        # self.drawing_widget.focusUpdated.connect(self.updateStyleSheet)
         self.container_layout.addWidget(self.drawing_widget, alignment=Qt.AlignCenter)
 
         self.image_layout.addWidget(self.container_widget)
@@ -80,6 +89,7 @@ class CentralWidget(QWidget):
 
         # When image zooms bigger than image widget
         self.scrollArea = QScrollArea()
+        self.scrollArea.setStyleSheet("QWidget { border: none;}")
         self.scrollArea.setWidgetResizable(True)
         self.scrollArea.setWidget(self.image_container)
         self.scrollArea.setHorizontalScrollBarPolicy(
@@ -88,6 +98,31 @@ class CentralWidget(QWidget):
         self.scrollArea.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
         self.central_widget_layout.addWidget(self.scrollArea)
+
+        self.drawing_widget.installEventFilter(self)
+
+    def eventFilter(self, obj: DrawingWidget, event: QEvent) -> bool:
+        """Catch focus"""
+        if obj == self.drawing_widget and event.type() == QEvent.FocusIn:
+            self.updateStyleSheet(True)
+        elif obj == self.drawing_widget and event.type() == QEvent.FocusOut:
+            self.updateStyleSheet(False)
+
+        return super().eventFilter(obj, event)
+
+    def updateStyleSheet(self, focused: bool = False) -> None:
+        """Change border color"""
+        border_color = FOCUSED if focused else UNFOCUSED
+
+        self.setStyleSheet(
+            f"""
+            QWidget#CentralWidget {{  
+                border: 2px solid {border_color}; 
+                border-radius: 10px;
+                background-color: white; 
+            }} 
+        """
+        )
 
     def hasPixmap(self) -> bool:
         """Check Pixmap existing"""

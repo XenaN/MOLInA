@@ -1,3 +1,4 @@
+from PySide6.QtCore import Qt, QEvent
 from PySide6.QtCore import (
     QDir,
     Signal,
@@ -14,6 +15,8 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
 )
 
+from molina.styles import SCROLLBAR_STYLE, FOCUSED, UNFOCUSED
+
 
 class FileManager(QWidget):
     """This class shows directories and images inside ones.
@@ -26,8 +29,13 @@ class FileManager(QWidget):
 
     def __init__(self, parent: QWidget):
         super(FileManager, self).__init__(parent)
+        self.setObjectName("FileManager")
+        self.updateStyleSheet(False)
+        self.setAttribute(Qt.WA_StyledBackground, True)
+
         self.file_layout = QVBoxLayout(self)
         self.file_view = QTreeView(self)
+        self.file_view.setStyleSheet(SCROLLBAR_STYLE)
 
         self.file_model = QFileSystemModel(self)
         self.file_model.setRootPath(QDir.rootPath())
@@ -48,6 +56,31 @@ class FileManager(QWidget):
 
         self.file_view.clicked.connect(self.onClicked)
         self.file_view.doubleClicked.connect(self.onDoubleClicked)
+
+        self.file_view.installEventFilter(self)
+
+    def eventFilter(self, obj: QTreeView, event: QEvent) -> bool:
+        """Catch focus"""
+        if obj == self.file_view and event.type() == QEvent.FocusIn:
+            self.updateStyleSheet(True)
+        elif obj == self.file_view and event.type() == QEvent.FocusOut:
+            self.updateStyleSheet(False)
+
+        return super().eventFilter(obj, event)
+
+    def updateStyleSheet(self, focused: bool = False) -> None:
+        """Change border color"""
+        border_color = FOCUSED if focused else UNFOCUSED
+
+        self.setStyleSheet(
+            f"""
+            QWidget#FileManager {{  
+                border: 2px solid {border_color}; 
+                border-radius: 10px;
+                background-color: white; 
+            }} 
+        """
+        )
 
     def onClicked(self, index: QModelIndex) -> None:
         """Open/close directory"""

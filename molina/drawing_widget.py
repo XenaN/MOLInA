@@ -1,13 +1,7 @@
 from typing import Dict, Optional, Union, List
 
 from PySide6.QtWidgets import QWidget
-from PySide6.QtCore import (
-    Qt,
-    QSize,
-    QRect,
-    QPoint,
-    QLine,
-)
+from PySide6.QtCore import Qt, QSize, QRect, QPoint, QLine, Signal
 from PySide6.QtGui import (
     QPainter,
     QPen,
