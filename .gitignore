@@ -163,3 +163,7 @@ cython_debug/
 #.idea/
 .vscode
 .history
+.app.spec
+.app_orig.spec
+.dist/
+.build/
