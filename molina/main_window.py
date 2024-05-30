@@ -26,15 +26,13 @@ from PySide6.QtGui import (
     QPalette,
     QColor,
     QPixmap,
-    QIcon,
     QImage,
     QPaintEvent,
     QAction,
-    QRegion,
 )
 
 from molina.data_structs import Dataset, Worker
-from molina.central_widget import CentralWidget
+from molina.central_widget import CentralWidget, ResourcePathMixin
 from molina.action_managers import FileActionManager
 from molina.file_manager import FileManager
 from molina.help_widget import HelpWindow
@@ -42,11 +40,10 @@ from molina.hotkeys import Hotkeys
 from molina.styles import TOOLBAR_STYLE, TEXT_STYLE
 
 
-RESOURCES_PATH = QDir("molina/resources")
 COLOR_BACKGROUND_WIDGETS = QColor(250, 250, 250)
 
 
-class MainWindow(QMainWindow):
+class MainWindow(QMainWindow, ResourcePathMixin):
     """Main Window class contains three parts: File Manager, Drawing Widget and Text Representation.
     It has toolbar with open, save, left, right, recent, current model, clean all and predict buttons.
     Also it will have Help button for describing hot keys abilities.
@@ -56,9 +53,11 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super(MainWindow, self).__init__()
+        # Path setup for resources
+        self.setup_resource_path()
 
         self.setWindowTitle("MOLInA")
-        self.setWindowIcon(QIcon(RESOURCES_PATH.filePath("icon.png")))
+        self.setWindowIcon(self.get_icon("icon.PNG"))
 
         self.page_layout = QHBoxLayout()
         self.splitter = QSplitter(self)
@@ -94,24 +93,24 @@ class MainWindow(QMainWindow):
         self.splitter.setStretchFactor(2, 5)
 
         self.button_open = QToolButton()
-        self.button_open.setToolTip("Open")
-        self.button_open.setIcon(QIcon(RESOURCES_PATH.filePath("open.png")))
+        self.button_open.setToolTip("Open image")
+        self.button_open.setIcon(self.get_icon("open.png"))
         self.button_open.pressed.connect(self.openImage)
 
         self.button_save = QToolButton()
-        self.button_save.setToolTip("Save")
-        self.button_save.setIcon(QIcon(RESOURCES_PATH.filePath("save.png")))
+        self.button_save.setToolTip("Save annotation")
+        self.button_save.setIcon(self.get_icon("save.png"))
         self.button_save.pressed.connect(self.data_images.saveAnnotation)
 
         self.button_clean = QToolButton()
-        self.button_clean.setToolTip("Clean All")
-        self.button_clean.setIcon(QIcon(RESOURCES_PATH.filePath("eraser.png")))
+        self.button_clean.setToolTip("Clean image")
+        self.button_clean.setIcon(self.get_icon("eraser.png"))
         self.button_clean.pressed.connect(self.central_widget.drawing_widget.clearAll)
 
         self.model_menu = QMenu()
         self.button_current_model = QToolButton()
         self.button_current_model.setToolTip("Choose model")
-        self.button_current_model.setIcon(QIcon(RESOURCES_PATH.filePath("choose.png")))
+        self.button_current_model.setIcon(self.get_icon("choose.png"))
         self.button_current_model.setMenu(self.model_menu)
 
         self.model_menu_items = ["MolScribe", "another"]
@@ -120,7 +119,7 @@ class MainWindow(QMainWindow):
 
         self.button_predict = QToolButton()
         self.button_predict.setToolTip("Predict")
-        self.button_predict.setIcon(QIcon(RESOURCES_PATH.filePath("predict.png")))
+        self.button_predict.setIcon(self.get_icon("predict.png"))
         self.button_predict.pressed.connect(self.startPrediction)
 
         # Add a spacer widget between buttons
@@ -129,19 +128,19 @@ class MainWindow(QMainWindow):
 
         self.button_left = QToolButton()
         self.button_left.setToolTip("Back")
-        self.button_left.setIcon(QIcon(RESOURCES_PATH.filePath("left.png")))
+        self.button_left.setIcon(self.get_icon("left.png"))
         self.button_left.pressed.connect(self.leftImage)
 
         self.recent_menu = QMenu()
         self.button_recent = QToolButton()
         self.button_recent.setToolTip("Recent")
-        self.button_recent.setIcon(QIcon(RESOURCES_PATH.filePath("recent.png")))
+        self.button_recent.setIcon(self.get_icon("recent.png"))
         self.button_recent.setMenu(self.recent_menu)
         self.button_recent.pressed.connect(self.showRecent)
 
         self.help_button = QToolButton()
         self.help_button.setToolTip("Help")
-        self.help_button.setIcon(QIcon(RESOURCES_PATH.filePath("help.png")))
+        self.help_button.setIcon(self.get_icon("help.png"))
         self.help_button.clicked.connect(self.showHelpWindow)
 
         self.hotkeys = Hotkeys()
@@ -192,7 +191,7 @@ class MainWindow(QMainWindow):
             raise ValueError("Unexpected array dimension")
 
         if q_image.isNull():
-            ValueError("Unsupported array shape for QPixmap conversion")
+            raise ValueError("Unsupported array shape for QPixmap conversion")
 
         self.central_widget.setCentralPixmap(QPixmap.fromImage(q_image))
 

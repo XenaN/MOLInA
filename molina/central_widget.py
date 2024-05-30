@@ -1,3 +1,5 @@
+import sys, os
+
 from PySide6.QtCore import Qt, QDir, QEvent
 from PySide6.QtWidgets import (
     QToolButton,
@@ -17,13 +19,28 @@ from PySide6.QtGui import (
 )
 
 from molina.drawing_widget import DrawingWidget
-from molina.styles import SCROLLBAR_STYLE, FOCUSED, UNFOCUSED, COLOR_BACKGROUND_WIDGETS
+from molina.styles import FOCUSED, UNFOCUSED, COLOR_BACKGROUND_WIDGETS
 
 
-RESOURCES_PATH = QDir("molina/resources")
+class ResourcePathMixin:
+    def setup_resource_path(self) -> None:
+        """Sets up the base path for resources depending on the execution mode"""
+        if getattr(sys, "frozen", False):
+            base_path = os.path.join(sys._MEIPASS, "resources")
+        else:
+            base_path = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "resources")
+            )
+
+        # Create a method that composes full paths to resources
+        self.resource_path = lambda filename: os.path.join(base_path, filename)
+
+    def get_icon(self, icon_name: str) -> QIcon:
+        """Utility method to get an icon with the given name."""
+        return QIcon(self.resource_path(icon_name))
 
 
-class CentralWidget(QWidget):
+class CentralWidget(QWidget, ResourcePathMixin):
     """
     Widget between File Manager and Annotation text.
     It contains zoom buttons, an image representation and a drawing area.
@@ -31,6 +48,7 @@ class CentralWidget(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setup_resource_path()
         self.setObjectName("CentralWidget")
         self.updateStyleSheet(focused=False)
 
@@ -47,12 +65,12 @@ class CentralWidget(QWidget):
         self.toolbar_zoom = QToolBar()
 
         self.button_zoom_in = QToolButton()
-        self.button_zoom_in.setIcon(QIcon(RESOURCES_PATH.filePath("plus.png")))
+        self.button_zoom_in.setIcon(self.get_icon("plus.png"))
         self.button_zoom_in.clicked.connect(self.zoomIn)
         self.toolbar_zoom.addWidget(self.button_zoom_in)
 
         self.button_zoom_out = QToolButton()
-        self.button_zoom_out.setIcon(QIcon(RESOURCES_PATH.filePath("minus.png")))
+        self.button_zoom_out.setIcon(self.get_icon("minus.png"))
         self.button_zoom_out.clicked.connect(self.zoomOut)
         self.toolbar_zoom.addWidget(self.button_zoom_out)
 
